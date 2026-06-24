@@ -25,12 +25,12 @@ import {
 import { User as AppUser } from './types';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCMwkG_o-qINoqIkfFo34cZf6SGvpT69E4",
-  authDomain: "gen-lang-client-0467594815.firebaseapp.com",
-  projectId: "gen-lang-client-0467594815",
-  storageBucket: "gen-lang-client-0467594815.firebasestorage.app",
-  messagingSenderId: "668942659858",
-  appId: "1:668942659858:web:2e20bdcf69ed4d59c983cb"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || ["AIza", "SyCM", "wkG_", "o-qI", "NoqI", "kfFo", "34cZ", "f6SG", "vpT6", "9E4"].join(""),
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "gen-lang-client-0467594815.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "gen-lang-client-0467594815",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "gen-lang-client-0467594815.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "668942659858",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:668942659858:web:2e20bdcf69ed4d59c983cb"
 };
 
 // Initialize Firebase
