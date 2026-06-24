@@ -1,0 +1,388 @@
+import React, { useState, useEffect } from 'react';
+import { ShoppingBag, X, Trash2, Plus, Minus, CreditCard, ShieldCheck, Truck, Sparkles, MapPin, CheckCircle } from 'lucide-react';
+import { CartItem, Order, User } from '../types';
+
+interface CartProps {
+  isOpen: boolean;
+  onClose: () => void;
+  cartItems: CartItem[];
+  onUpdateQuantity: (productId: string, size: string, change: number) => void;
+  onRemoveItem: (productId: string, size: string) => void;
+  onClearCart: () => void;
+  user?: User | null;
+}
+
+export default function Cart({ isOpen, onClose, cartItems, onUpdateQuantity, onRemoveItem, onClearCart, user = null }: CartProps) {
+  const [isCheckoutState, setIsCheckoutState] = useState(false);
+  const [customerName, setCustomerName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [address, setAddress] = useState('');
+  const [note, setNote] = useState('');
+  const [confirmedOrder, setConfirmedOrder] = useState<Order | null>(null);
+
+  // Prefill user details if logged in
+  useEffect(() => {
+    if (user) {
+      if (!customerName) setCustomerName(user.displayName);
+      if (!email) setEmail(user.email);
+    }
+  }, [user, isCheckoutState]);
+
+  if (!isOpen) return null;
+
+  const subtotal = cartItems.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
+  const shippingFee = subtotal > 0 ? 0 : 0; // FREE SHIP TOÀN QUỐC
+  const total = subtotal + shippingFee;
+
+  const formatPrice = (price: number) => {
+    return price.toLocaleString('vi-VN') + ' ₫';
+  };
+
+  const handleCheckoutSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!customerName || !phone || !email || !address) {
+      alert('Tụi mình cần đầy đủ thông tin tên, số điện thoại và địa chỉ để gửi hàng nhé!');
+      return;
+    }
+
+    const newOrder: Order = {
+      id: 'ECH-ORD-' + Math.floor(100000 + Math.random() * 900000),
+      customerName,
+      phone,
+      email,
+      address,
+      note: note || '',
+      items: [...cartItems],
+      totalPrice: total,
+      paymentMethod: 'COD',
+      status: 'pending',
+      createdAt: new Date().toLocaleDateString('vi-VN') + ' ' + new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+    };
+
+    // Save order in localStorage so they can see order confirmation history
+    const existingOrders = localStorage.getItem('echove_orders');
+    const ordersList = existingOrders ? JSON.parse(existingOrders) : [];
+    localStorage.setItem('echove_orders', JSON.stringify([newOrder, ...ordersList]));
+
+    setConfirmedOrder(newOrder);
+    onClearCart();
+    setIsCheckoutState(false);
+    
+    // Reset fields
+    setCustomerName('');
+    setPhone('');
+    setEmail('');
+    setAddress('');
+    setNote('');
+  };
+
+  const handleClose = () => {
+    setConfirmedOrder(null);
+    setIsCheckoutState(false);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-hidden" aria-labelledby="slide-over-title" role="dialog" aria-modal="true">
+      {/* Backdrop */}
+      <div 
+        className="absolute inset-0 bg-black/85 backdrop-blur-xs transition-opacity" 
+        onClick={handleClose}
+      ></div>
+
+      {/* Cart Drawer Container */}
+      <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
+        <div className="w-screen max-w-md bg-denim-dark border-l border-white/10 text-white flex flex-col justify-between shadow-2xl animate-in slide-in-from-right duration-300">
+          
+          {/* Header */}
+          <div className="px-4 sm:px-6 py-6 border-b border-white/10 flex items-center justify-between">
+            <h2 className="font-display font-black text-2xl tracking-widest uppercase flex items-center space-x-2">
+              <ShoppingBag className="w-6 h-6 text-mustard" />
+              <span>{confirmedOrder ? 'ĐẶT HÀNG THÀNH CÔNG' : isCheckoutState ? 'THỦ TỤC THANH TOÁN' : 'GIỎ HÀNG CỦA BẠN'}</span>
+            </h2>
+            <button
+              onClick={handleClose}
+              className="p-2 text-white/60 hover:text-mustard hover:bg-white/5 rounded-full transition-colors cursor-pointer"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 space-y-6">
+            
+            {/* Case 1: Order Confirmed State */}
+            {confirmedOrder ? (
+              <div className="space-y-6 text-center py-6 animate-in zoom-in duration-300">
+                <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-full flex items-center justify-center mx-auto scale-110">
+                  <CheckCircle className="w-10 h-10 stroke-[1.5]" />
+                </div>
+                
+                <div className="space-y-2">
+                  <h3 className="font-display font-black text-2xl tracking-wide uppercase text-mustard">MUA HÀNG THÀNH CÔNG!</h3>
+                  <p className="font-sans text-xs sm:text-sm text-white/70">
+                    Cảm ơn bạn đã lựa chọn thời trang upcycled của ECHOVE. Quyết định mua hàng của bạn đã giúp kéo dài vòng đời dệt may thêm nhiều năm! 🌱🤘
+                  </p>
+                </div>
+
+                {/* Receipt Details Box */}
+                <div className="bg-ash-dark/40 border border-white/5 rounded-xs p-4 text-left text-xs font-mono space-y-2.5">
+                  <div className="flex justify-between border-b border-white/5 pb-2">
+                    <span className="text-white/40">Mã đơn hàng:</span>
+                    <span className="text-mustard font-bold">{confirmedOrder.id}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-white/5 pb-2">
+                    <span className="text-white/40">Người nhận:</span>
+                    <span className="text-white">{confirmedOrder.customerName}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-white/5 pb-2">
+                    <span className="text-white/40">Số điện thoại:</span>
+                    <span className="text-white">{confirmedOrder.phone}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-white/5 pb-2">
+                    <span className="text-white/40">Địa chỉ giao:</span>
+                    <span className="text-white leading-normal text-right max-w-[200px] block">{confirmedOrder.address}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-white/5 pb-2">
+                    <span className="text-white/40">Phương thức:</span>
+                    <span className="text-emerald-400 font-bold">COD (Thanh toán khi nhận)</span>
+                  </div>
+                  <div className="flex justify-between pt-1 font-bold text-sm">
+                    <span className="text-mustard uppercase font-display text-lg tracking-wide">TỔNG CỘNG:</span>
+                    <span className="text-mustard font-sans text-lg">{formatPrice(confirmedOrder.totalPrice)}</span>
+                  </div>
+                </div>
+
+                <div className="text-xs text-white/40 leading-relaxed italic bg-white/5 p-3 rounded-xs border border-white/10">
+                  ⚡ ECHOVE sẽ gọi điện xác minh số điện thoại đơn hàng trong vòng 24h trước khi gửi hàng dạo phố nhé!
+                </div>
+
+                <button
+                  onClick={handleClose}
+                  className="w-full bg-white hover:bg-mustard text-denim-dark font-display text-lg tracking-widest py-3 font-bold transition-all duration-200 rounded-xs cursor-pointer uppercase"
+                >
+                  TIẾP TỤC KHÁM PHÁ CỬA HÀNG
+                </button>
+              </div>
+            ) : isCheckoutState ? (
+              /* Case 2: Checkout Form State */
+              <form onSubmit={handleCheckoutSubmit} className="space-y-5">
+                <div className="border-b border-white/10 pb-3">
+                  <h3 className="font-display font-bold text-lg text-white tracking-widest uppercase">THÔNG TIN GIAO HÀNG</h3>
+                  <p className="text-[10px] text-white/40 font-mono uppercase mt-0.5">Vui lòng điền đúng để shipper giao chính xác nha</p>
+                </div>
+
+                {/* Name */}
+                <div className="space-y-1.5">
+                  <label className="font-display text-sm tracking-widest text-white/70 uppercase">Tên người nhận *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Nguyễn Văn A"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    className="w-full bg-denim-dark border border-white/10 px-4 py-2 text-sm text-white focus:outline-none focus:border-mustard font-sans"
+                  />
+                </div>
+
+                {/* Phone */}
+                <div className="space-y-1.5">
+                  <label className="font-display text-sm tracking-widest text-white/70 uppercase">Số điện thoại *</label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="09xxxxxxxx"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="w-full bg-denim-dark border border-white/10 px-4 py-2 text-sm text-white focus:outline-none focus:border-mustard font-sans"
+                  />
+                </div>
+
+                {/* Email */}
+                <div className="space-y-1.5">
+                  <label className="font-display text-sm tracking-widest text-white/70 uppercase">Email nhận hóa đơn *</label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="nhan_hoa_don@gmail.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full bg-denim-dark border border-white/10 px-4 py-2 text-sm text-white focus:outline-none focus:border-mustard font-sans"
+                  />
+                </div>
+
+                {/* Address */}
+                <div className="space-y-1.5">
+                  <label className="font-display text-sm tracking-widest text-white/70 uppercase">Địa chỉ nhận hàng *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Số nhà, Tên đường, Quận, Tỉnh/Thành phố"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    className="w-full bg-denim-dark border border-white/10 px-4 py-2 text-sm text-white focus:outline-none focus:border-mustard font-sans"
+                  />
+                </div>
+
+                {/* Note */}
+                <div className="space-y-1.5">
+                  <label className="font-display text-sm tracking-widest text-white/70 uppercase">Lời nhắn / Yêu cầu thêm (nếu có)</label>
+                  <textarea
+                    placeholder="Ví dụ: Giao ngoài giờ hành chính, bọc kỹ vì mình mang đi tặng bạn nha..."
+                    rows={2}
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    className="w-full bg-denim-dark border border-white/10 px-4 py-2 text-sm text-white focus:outline-none focus:border-mustard font-sans resize-none"
+                  />
+                </div>
+
+                {/* Info Block on Payment */}
+                <div className="bg-ash-dark/40 border border-white/5 rounded-xs p-4 space-y-2 text-xs">
+                  <div className="flex items-center space-x-2 text-emerald-400">
+                    <CreditCard className="w-4 h-4" />
+                    <span className="font-display font-bold uppercase tracking-wider">COD (Thanh toán khi nhận hàng)</span>
+                  </div>
+                  <p className="font-sans text-white/60 leading-normal">
+                    Để thuận tiện nhất và bảo mật thông tin, tụi mình áp dụng phương thức COD đồng giá miễn phí vận chuyển trên toàn quốc. Bạn được kiểm tra hàng thỏa thích trước khi trả tiền cho bưu tá nha.
+                  </p>
+                </div>
+
+                <div className="flex space-x-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsCheckoutState(false)}
+                    className="w-1/3 bg-transparent hover:bg-white/5 border border-white/10 text-white/70 font-display text-base tracking-widest py-3 rounded-xs transition-colors"
+                  >
+                    QUAY LẠI
+                  </button>
+                  <button
+                    type="submit"
+                    className="w-2/3 bg-orange-earth hover:bg-orange-earth/90 text-white font-display text-base tracking-widest py-3 font-bold rounded-xs transition-colors uppercase cursor-pointer"
+                  >
+                    HOÀN TẤT ĐẶT HÀNG
+                  </button>
+                </div>
+              </form>
+            ) : cartItems.length === 0 ? (
+              /* Case 3: Empty Cart */
+              <div className="text-center py-20 space-y-4">
+                <div className="inline-flex items-center justify-center p-4 bg-white/5 border border-white/10 rounded-full text-white/40">
+                  <ShoppingBag className="w-10 h-10 stroke-[1.5]" />
+                </div>
+                <div className="space-y-1">
+                  <p className="font-display font-bold text-xl uppercase tracking-wider text-white">Giỏ hàng rỗng</p>
+                  <p className="font-sans text-xs text-white/40">Bạn chưa thêm món độc bản nào vào giỏ cả.</p>
+                </div>
+                <button
+                  onClick={onClose}
+                  className="bg-mustard text-denim-dark font-display text-base tracking-widest px-6 py-2.5 rounded-xs font-bold transition-all duration-200 cursor-pointer hover:bg-mustard/90"
+                >
+                  ĐI DẠO PHỐ MUA SẮM
+                </button>
+              </div>
+            ) : (
+              /* Case 4: Cart Items List */
+              <div className="space-y-4">
+                {cartItems.map((item) => (
+                  <div 
+                    key={`${item.product.id}-${item.selectedSize}`}
+                    className="flex bg-ash-dark/30 border border-white/10 p-3 items-center space-x-4 rounded-xs text-xs sm:text-sm"
+                  >
+                    {/* Item Image */}
+                    <div className="w-16 h-16 bg-denim-light shrink-0 border border-white/5 rounded-xs overflow-hidden">
+                      <img
+                        src={item.product.images[0]}
+                        alt={item.product.name}
+                        className="w-full h-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+
+                    {/* Item Details */}
+                    <div className="flex-1 space-y-1 min-w-0">
+                      <h4 className="font-display font-bold text-base tracking-wide text-white truncate uppercase">
+                        {item.product.name}
+                      </h4>
+                      <p className="font-mono text-[10px] text-white/40 uppercase">Size: {item.selectedSize}</p>
+                      <p className="font-mono text-mustard font-semibold">{formatPrice(item.product.price)}</p>
+                    </div>
+
+                    {/* Actions and Qty */}
+                    <div className="flex flex-col items-end justify-between space-y-2 shrink-0">
+                      <button
+                        onClick={() => onRemoveItem(item.product.id, item.selectedSize)}
+                        className="text-white/40 hover:text-orange-earth p-1"
+                        title="Xóa sản phẩm"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+
+                      <div className="flex items-center space-x-2 bg-denim-dark border border-white/10 px-2 py-0.5 rounded-xs">
+                        <button
+                          onClick={() => onUpdateQuantity(item.product.id, item.selectedSize, -1)}
+                          className="p-0.5 text-white/60 hover:text-white"
+                        >
+                          <Minus className="w-3.5 h-3.5" />
+                        </button>
+                        <span className="font-mono font-bold text-xs text-white min-w-[14px] text-center">{item.quantity}</span>
+                        <button
+                          onClick={() => onUpdateQuantity(item.product.id, item.selectedSize, 1)}
+                          className="p-0.5 text-white/60 hover:text-white"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Footer (Price calculations, shipping details) */}
+          {!confirmedOrder && cartItems.length > 0 && (
+            <div className="px-4 sm:px-6 py-6 border-t border-white/10 bg-ash-dark/20 space-y-4">
+              
+              {/* Calculations */}
+              <div className="space-y-2.5 text-sm font-mono">
+                <div className="flex justify-between text-white/70">
+                  <span>Tạm tính:</span>
+                  <span>{formatPrice(subtotal)}</span>
+                </div>
+                <div className="flex justify-between text-white/70">
+                  <span>Phí vận chuyển:</span>
+                  <span className="text-emerald-400 font-bold">MIỄN PHÍ</span>
+                </div>
+                <hr className="border-white/5" />
+                <div className="flex justify-between text-base">
+                  <span className="font-display uppercase tracking-widest text-lg font-bold text-white">TỔNG THANH TOÁN:</span>
+                  <span className="text-mustard font-bold text-xl">{formatPrice(total)}</span>
+                </div>
+              </div>
+
+              {/* Secure note */}
+              <div className="flex items-center justify-center space-x-1.5 text-[10px] font-mono text-white/40">
+                <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+                <span>Thanh toán COD khi nhận hàng an tâm 100%.</span>
+              </div>
+
+              {/* Checkout Action Button */}
+              {!isCheckoutState ? (
+                <button
+                  onClick={() => setIsCheckoutState(true)}
+                  className="w-full bg-mustard hover:bg-mustard/90 text-denim-dark font-display text-lg tracking-widest py-3.5 font-bold transition-all duration-300 rounded-xs cursor-pointer shadow-lg active:scale-98 uppercase"
+                  id="cart-checkout-btn"
+                >
+                  TIẾP TỤC THANH TOÁN
+                </button>
+              ) : null}
+            </div>
+          )}
+
+        </div>
+      </div>
+    </div>
+  );
+}

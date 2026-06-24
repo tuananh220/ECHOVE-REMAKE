@@ -1,0 +1,6 @@
+{
+  "name": "ECHOVE",
+  "description": "ECHOVE - Upcycled Denim Streetwear Việt Nam. Biến quần jean cũ thành phụ kiện và trang phục streetwear độc bản (1-of-1). Jean cũ, chuyện mới.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
