@@ -134,13 +134,13 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0F1012]/80 backdrop-blur-md">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-denim-dark/80 backdrop-blur-md">
           {/* Modal Card */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-md bg-[#1C1E22] border border-white/10 p-6 sm:p-8 rounded-xs overflow-hidden shadow-2xl"
+            className="relative w-full max-w-md bg-denim-light border border-white/10 p-6 sm:p-8 rounded-xs overflow-hidden shadow-2xl"
           >
             {/* Background design accents */}
             <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
@@ -226,7 +226,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
                             placeholder="vd: Minh Streetwear"
                             value={displayName}
                             onChange={(e) => setDisplayName(e.target.value)}
-                            className="w-full bg-[#0F1012] border border-white/10 text-white pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-mustard transition-colors rounded-xs"
+                            className="w-full bg-denim-dark border border-white/10 text-white pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-mustard transition-colors rounded-xs"
                           />
                         </div>
                       </div>
@@ -242,7 +242,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
                           placeholder="ten@email.com"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
-                          className="w-full bg-[#0F1012] border border-white/10 text-white pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-mustard transition-colors rounded-xs"
+                          className="w-full bg-denim-dark border border-white/10 text-white pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-mustard transition-colors rounded-xs"
                         />
                       </div>
                     </div>
@@ -264,7 +264,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
                           placeholder="••••••••"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          className="w-full bg-[#0F1012] border border-white/10 text-white pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-mustard transition-colors rounded-xs"
+                          className="w-full bg-denim-dark border border-white/10 text-white pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-mustard transition-colors rounded-xs"
                         />
                       </div>
                     </div>
@@ -444,7 +444,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
                         </div>
                       </div>
 
-                      <div className="bg-[#0F1012] p-3 text-[10px] font-mono text-white/40 leading-relaxed border border-white/5">
+                      <div className="bg-denim-dark p-3 text-[10px] font-mono text-white/40 leading-relaxed border border-white/5">
                         🛡️ Bằng việc chọn tài khoản, bạn cho phép ứng dụng này truy xuất thông tin Hồ sơ công khai và Email dạo phố. ECHOVE cam kết không tiết lộ dữ liệu cá nhân của bạn.
                       </div>
 

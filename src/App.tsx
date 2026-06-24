@@ -23,6 +23,28 @@ export default function App() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState<boolean>(false);
   
+  // Theme state
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    const saved = localStorage.getItem('echove_theme');
+    return (saved === 'light' || saved === 'dark') ? saved : 'dark';
+  });
+
+  // Toggle theme handler
+  const handleToggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
+  // Sync theme with DOM element
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'light') {
+      root.classList.add('light');
+    } else {
+      root.classList.remove('light');
+    }
+    localStorage.setItem('echove_theme', theme);
+  }, [theme]);
+  
   // Custom Dynamic Products list state
   const [products, setProducts] = useState<Product[]>(PRODUCTS);
   
@@ -125,6 +147,8 @@ export default function App() {
         user={user}
         onOpenAuth={() => setIsAuthOpen(true)}
         onSignOut={handleSignOut}
+        theme={theme}
+        onToggleTheme={handleToggleTheme}
       />
 
       {/* Main Pages Router */}

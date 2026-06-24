@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShoppingBag, Menu, X, Gift, RefreshCw, LogIn, LogOut, User as UserIcon, Award } from 'lucide-react';
+import { ShoppingBag, Menu, X, Gift, RefreshCw, LogIn, LogOut, User as UserIcon, Award, Sun, Moon } from 'lucide-react';
 import { User } from '../types';
 import logo from '../assets/logo.svg';
 
@@ -11,6 +11,8 @@ interface NavbarProps {
   user: User | null;
   onOpenAuth: () => void;
   onSignOut: () => void;
+  theme: 'dark' | 'light';
+  onToggleTheme: () => void;
 }
 
 export default function Navbar({
@@ -21,6 +23,8 @@ export default function Navbar({
   user,
   onOpenAuth,
   onSignOut,
+  theme,
+  onToggleTheme,
 }: NavbarProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
@@ -94,6 +98,15 @@ export default function Navbar({
               <span>GỬI JEAN CŨ</span>
             </button>
 
+            {/* Theme Toggle Button */}
+            <button
+              onClick={onToggleTheme}
+              className="p-2 text-white/90 hover:text-mustard hover:scale-105 transition-all duration-200 focus:outline-none cursor-pointer"
+              title={theme === 'dark' ? 'Chuyển sang Giao diện Sáng' : 'Chuyển sang Giao diện Tối'}
+            >
+              {theme === 'dark' ? <Sun className="w-5.5 h-5.5 stroke-[1.5]" /> : <Moon className="w-5.5 h-5.5 stroke-[1.5]" />}
+            </button>
+
             {/* Cart Button */}
             <button
               onClick={() => setIsCartOpen(true)}
@@ -125,7 +138,7 @@ export default function Navbar({
 
                 {/* User Dropdown */}
                 {isUserDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-64 bg-[#1C1E22] border border-white/10 shadow-2xl p-4 space-y-4 rounded-xs z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                  <div className="absolute right-0 mt-2 w-64 bg-denim-light border border-white/10 shadow-2xl p-4 space-y-4 rounded-xs z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                     <div className="border-b border-white/5 pb-3">
                       <p className="text-white font-semibold text-sm truncate">{user.displayName}</p>
                       <p className="text-white/40 text-[10px] font-mono truncate">{user.email}</p>
@@ -135,7 +148,7 @@ export default function Navbar({
                       </div>
                     </div>
 
-                    <div className="bg-[#0F1012] p-3 border border-white/5 flex items-center justify-between rounded-xs">
+                    <div className="bg-denim-dark p-3 border border-white/5 flex items-center justify-between rounded-xs">
                       <div className="flex items-center space-x-2">
                         <Award className="w-5 h-5 text-mustard" />
                         <div>
@@ -227,7 +240,7 @@ export default function Navbar({
             ))}
 
             {user && (
-              <div className="mx-4 p-3 border-t border-b border-white/5 bg-[#1C1E22] flex items-center justify-between rounded-xs my-3 text-left">
+              <div className="mx-4 p-3 border-t border-b border-white/5 bg-denim-light flex items-center justify-between rounded-xs my-3 text-left">
                 <div className="flex items-center space-x-2">
                   <div className="w-8 h-8 rounded-xs bg-mustard/25 text-mustard flex items-center justify-center font-display font-black text-xs border border-mustard/30">
                     {getUserInitials(user.displayName)}
@@ -245,6 +258,17 @@ export default function Navbar({
             )}
 
             <div className="pt-2 px-4 space-y-2">
+              {/* Mobile Theme Toggle */}
+              <button
+                onClick={() => {
+                  onToggleTheme();
+                }}
+                className="w-full flex items-center justify-center space-x-2 bg-white/5 border border-white/10 text-white font-display text-lg tracking-widest py-3 rounded-xs"
+              >
+                {theme === 'dark' ? <Sun className="w-5 h-5 text-mustard" /> : <Moon className="w-5 h-5 text-mustard" />}
+                <span>{theme === 'dark' ? 'CHUYỂN NỀN SÁNG' : 'CHUYỂN NỀN TỐI'}</span>
+              </button>
+
               <button
                 onClick={() => handleNavClick('donor')}
                 className="w-full flex items-center justify-center space-x-2 bg-orange-earth text-white font-display text-lg tracking-widest py-3 border border-white/20 rounded-xs"
