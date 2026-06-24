@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Mail, Lock, User as UserIcon, Shield, Chrome, Facebook, Instagram, ArrowRight, CheckCircle, RefreshCw, AlertCircle } from 'lucide-react';
+import { X, Mail, Lock, User as UserIcon, Shield, Chrome, Facebook, Instagram, ArrowRight, CheckCircle, RefreshCw, AlertCircle, Sparkles } from 'lucide-react';
 import { User } from '../types';
+import { 
+  signInWithGoogle, 
+  registerWithEmail, 
+  loginWithEmail, 
+  sendPasswordReset 
+} from '../firebase';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -17,6 +23,10 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(false);
+  
+  // Forgot Password / Verification states
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
   
   // Status States
   const [isLoading, setIsLoading] = useState(false);
@@ -57,13 +67,16 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
     setPassword('');
     setDisplayName('');
     setError('');
+    setSuccessMessage('');
+    setIsForgotPassword(false);
     setSocialProvider(null);
     onClose();
   };
 
-  const handleEmailAuth = (e: React.FormEvent) => {
+  const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccessMessage('');
 
     if (!email || !password) {
       setError('Vui lòng nhập đầy đủ email và mật khẩu.');
@@ -83,25 +96,81 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
 
     setIsLoading(true);
 
-    // Simulate authentic authentication response
-    setTimeout(() => {
+    try {
+      if (activeTab === 'register') {
+        await registerWithEmail(email, password, displayName);
+        setIsLoading(false);
+        setSuccessMessage('Đăng ký tài khoản thành công! Chúng tôi đã gửi một email xác thực đến địa chỉ của bạn. Vui lòng kiểm tra hộp thư (bao gồm cả thư rác) và kích hoạt tài khoản của bạn để hoàn tất!');
+      } else {
+        const loggedInUser = await loginWithEmail(email, password);
+        setIsLoading(false);
+        onLoginSuccess(loggedInUser);
+        handleClose();
+      }
+    } catch (err: any) {
       setIsLoading(false);
-      const isAdmin = email.trim().toLowerCase() === 'admin@echove.vn';
-      const matchedUser: User = {
-        uid: isAdmin ? 'admin-uid' : Math.random().toString(36).substr(2, 9),
-        email,
-        displayName: isAdmin ? 'ECHOVE Admin' : (activeTab === 'register' ? displayName : email.split('@')[0]),
-        providerId: 'password',
-        points: isAdmin ? 9999 : (activeTab === 'register' ? 50 : 120), // bonus for registering!
-        role: isAdmin ? 'admin' : 'user',
-      };
-      
-      onLoginSuccess(matchedUser);
-      handleClose();
-    }, 1500);
+      console.error('Email authentication error:', err);
+      let friendlyError = 'Đã xảy ra lỗi khi xác thực. Vui lòng kiểm tra lại.';
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
+        friendlyError = 'Email hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại!';
+      } else if (err.code === 'auth/email-already-in-use') {
+        friendlyError = 'Địa chỉ email này đã được đăng ký bởi tài khoản khác.';
+      } else if (err.code === 'auth/weak-password') {
+        friendlyError = 'Mật khẩu quá yếu. Vui lòng nhập tối thiểu 6 ký tự!';
+      } else if (err.code === 'auth/invalid-email') {
+        friendlyError = 'Địa chỉ email không hợp lệ.';
+      } else if (err.message) {
+        friendlyError = err.message;
+      }
+      setError(friendlyError);
+    }
   };
 
-  const handleSocialClick = (provider: 'google' | 'facebook' | 'instagram') => {
+  const handleForgotPasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSuccessMessage('');
+
+    if (!email) {
+      setError('Vui lòng nhập địa chỉ email.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await sendPasswordReset(email);
+      setIsLoading(false);
+      setSuccessMessage('Chúng tôi đã gửi một email hướng dẫn đặt lại mật khẩu đến địa chỉ ' + email + '. Vui lòng kiểm tra hộp thư của bạn (bao gồm cả thư rác) nhé!');
+    } catch (err: any) {
+      setIsLoading(false);
+      console.error('Password reset error:', err);
+      let friendlyError = 'Không thể gửi email đặt lại mật khẩu. Vui lòng thử lại sau.';
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+        friendlyError = 'Không tìm thấy tài khoản liên kết với email này.';
+      } else if (err.code === 'auth/invalid-email') {
+        friendlyError = 'Địa chỉ email không hợp lệ.';
+      }
+      setError(friendlyError);
+    }
+  };
+
+  const handleSocialClick = async (provider: 'google' | 'facebook' | 'instagram') => {
+    if (provider === 'google') {
+      setError('');
+      setIsLoading(true);
+      try {
+        const loggedInUser = await signInWithGoogle();
+        setIsLoading(false);
+        onLoginSuccess(loggedInUser);
+        handleClose();
+      } catch (err: any) {
+        setIsLoading(false);
+        console.error('Google sign-in error:', err);
+        setError('Không thể kết nối tài khoản Google: ' + (err.message || 'Lỗi bất định'));
+      }
+      return;
+    }
+
     setSocialProvider(provider);
     setSocialStep('loading');
     
@@ -166,44 +235,60 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
                   </button>
 
                   {/* Header */}
-                  <div className="text-center space-y-1">
-                    <div className="inline-flex items-center space-x-1 bg-mustard/15 text-mustard px-2 py-0.5 rounded-full text-[10px] font-mono tracking-widest uppercase">
-                      <span>STREET STYLE CLUB</span>
+                  {isForgotPassword ? (
+                    <div className="text-center space-y-1">
+                      <div className="inline-flex items-center space-x-1 bg-mustard/15 text-mustard px-2 py-0.5 rounded-full text-[10px] font-mono tracking-widest uppercase">
+                        <span>STREET STYLE CLUB</span>
+                      </div>
+                      <h2 className="font-display font-black text-2xl sm:text-3xl text-white uppercase tracking-tight">
+                        QUÊN MẬT KHẨU
+                      </h2>
+                      <p className="text-white/40 text-xs font-light">
+                        Chúng tôi sẽ gửi email hướng dẫn tạo lại mật khẩu mới đến tài khoản dạo phố của bạn.
+                      </p>
                     </div>
-                    <h2 className="font-display font-black text-3xl sm:text-4xl text-white uppercase tracking-tight">
-                      {activeTab === 'login' ? 'ĐĂNG NHẬP' : 'TẠO TÀI KHOẢN'}
-                    </h2>
-                    <p className="text-white/40 text-xs font-light">
-                      {activeTab === 'login' 
-                        ? 'Chào mừng bạn quay trở lại với xưởng tái chế ECHOVE!' 
-                        : 'Tham gia Street Club để tích luỹ điểm xanh upcycle và nhận quà độc bản.'
-                      }
-                    </p>
-                  </div>
+                  ) : (
+                    <div className="text-center space-y-1">
+                      <div className="inline-flex items-center space-x-1 bg-mustard/15 text-mustard px-2 py-0.5 rounded-full text-[10px] font-mono tracking-widest uppercase">
+                        <span>STREET STYLE CLUB</span>
+                      </div>
+                      <h2 className="font-display font-black text-3xl sm:text-4xl text-white uppercase tracking-tight">
+                        {activeTab === 'login' ? 'ĐĂNG NHẬP' : 'TẠO TÀI KHOẢN'}
+                      </h2>
+                      <p className="text-white/40 text-xs font-light">
+                        {activeTab === 'login' 
+                          ? 'Chào mừng bạn quay trở lại với xưởng tái chế ECHOVE!' 
+                          : 'Tham gia Street Club để tích luỹ điểm xanh upcycle và nhận quà độc bản.'
+                        }
+                      </p>
+                    </div>
+                  )}
 
                   {/* Tab Selectors */}
-                  <div className="grid grid-cols-2 border-b border-white/10 pb-1">
-                    <button
-                      onClick={() => { setActiveTab('login'); setError(''); }}
-                      className={`pb-2.5 font-display text-sm tracking-widest uppercase border-b-2 transition-all ${
-                        activeTab === 'login'
-                          ? 'border-mustard text-mustard font-bold'
-                          : 'border-transparent text-white/40 hover:text-white/70'
-                      }`}
-                    >
-                      ĐĂNG NHẬP
-                    </button>
-                    <button
-                      onClick={() => { setActiveTab('register'); setError(''); }}
-                      className={`pb-2.5 font-display text-sm tracking-widest uppercase border-b-2 transition-all ${
-                        activeTab === 'register'
-                          ? 'border-mustard text-mustard font-bold'
-                          : 'border-transparent text-white/40 hover:text-white/70'
-                      }`}
-                    >
-                      ĐĂNG KÝ MỚI
-                    </button>
-                  </div>
+                  {!isForgotPassword && (
+                    <div className="grid grid-cols-2 border-b border-white/10 pb-1">
+                      <button
+                        onClick={() => { setActiveTab('login'); setError(''); setSuccessMessage(''); }}
+                        className={`pb-2.5 font-display text-sm tracking-widest uppercase border-b-2 transition-all ${
+                          activeTab === 'login'
+                            ? 'border-mustard text-mustard font-bold'
+                            : 'border-transparent text-white/40 hover:text-white/70'
+                        }`}
+                      >
+                        ĐĂNG NHẬP
+                      </button>
+                      <button
+                        onClick={() => { setActiveTab('register'); setError(''); setSuccessMessage(''); }}
+                        className={`pb-2.5 font-display text-sm tracking-widest uppercase border-b-2 transition-all ${
+                          activeTab === 'register'
+                            ? 'border-mustard text-mustard font-bold'
+                            : 'border-transparent text-white/40 hover:text-white/70'
+                        }`}
+                      >
+                        ĐĂNG KÝ MỚI
+                      </button>
+                    </div>
+                  )}
 
                   {/* Errors */}
                   {error && (
@@ -213,94 +298,161 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
                     </div>
                   )}
 
+                  {/* Success Messages */}
+                  {successMessage && (
+                    <div className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 p-3 rounded-xs flex items-start space-x-2 text-xs leading-relaxed">
+                      <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <span>{successMessage}</span>
+                    </div>
+                  )}
+
                   {/* Form */}
-                  <form onSubmit={handleEmailAuth} className="space-y-4">
-                    {activeTab === 'register' && (
+                  {isForgotPassword ? (
+                    <form onSubmit={handleForgotPasswordSubmit} className="space-y-4">
                       <div className="space-y-1.5">
-                        <label className="block text-[10px] font-mono uppercase text-white/50 tracking-wider">Tên hiển thị / Nickname</label>
+                        <label className="block text-[10px] font-mono uppercase text-white/50 tracking-wider">Địa chỉ Email</label>
                         <div className="relative">
-                          <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
                           <input
-                            type="text"
+                            type="email"
                             required
-                            placeholder="vd: Minh Streetwear"
-                            value={displayName}
-                            onChange={(e) => setDisplayName(e.target.value)}
+                            placeholder="ten@email.com"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
                             className="w-full bg-denim-dark border border-white/10 text-white pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-mustard transition-colors rounded-xs"
                           />
                         </div>
                       </div>
-                    )}
 
-                    <div className="space-y-1.5">
-                      <label className="block text-[10px] font-mono uppercase text-white/50 tracking-wider">Địa chỉ Email</label>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
-                        <input
-                          type="email"
-                          required
-                          placeholder="ten@email.com"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          className="w-full bg-denim-dark border border-white/10 text-white pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-mustard transition-colors rounded-xs"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between items-center">
-                        <label className="block text-[10px] font-mono uppercase text-white/50 tracking-wider">Mật khẩu bảo mật</label>
-                        {activeTab === 'login' && (
-                          <button type="button" onClick={() => setError('Tính năng khôi phục mật khẩu đang được tích hợp.')} className="text-[10px] text-mustard hover:underline font-mono">
-                            QUÊN MẬT KHẨU?
-                          </button>
+                      {/* Submit Button */}
+                      <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full bg-mustard hover:bg-mustard/90 text-denim-dark font-display font-black text-lg tracking-widest py-3 flex items-center justify-center space-x-2 transition-all cursor-pointer rounded-xs"
+                      >
+                        {isLoading ? (
+                          <>
+                            <RefreshCw className="w-5 h-5 animate-spin" />
+                            <span>ĐANG GỬI YÊU CẦU...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>GỬI EMAIL ĐẶT LẠI</span>
+                            <ArrowRight className="w-5 h-5" />
+                          </>
                         )}
-                      </div>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
-                        <input
-                          type="password"
-                          required
-                          placeholder="••••••••"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          className="w-full bg-denim-dark border border-white/10 text-white pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-mustard transition-colors rounded-xs"
-                        />
-                      </div>
-                    </div>
+                      </button>
 
-                    {activeTab === 'register' && (
-                      <label className="flex items-start space-x-2 pt-1 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={agreeTerms}
-                          onChange={(e) => setAgreeTerms(e.target.checked)}
-                          className="mt-0.5 rounded-sm border-white/15 bg-black text-mustard focus:ring-0 focus:ring-offset-0"
-                        />
-                        <span className="text-[11px] text-white/60 leading-relaxed font-light">
-                          Tôi đồng ý với chính sách thu gom, chia sẻ dữ liệu cộng đồng và điều khoản thành viên của ECHOVE Studio.
-                        </span>
-                      </label>
-                    )}
-
-                    {/* Submit Button */}
-                    <button
-                      type="submit"
-                      disabled={isLoading}
-                      className="w-full bg-mustard hover:bg-mustard/90 text-denim-dark font-display font-black text-lg tracking-widest py-3 flex items-center justify-center space-x-2 transition-all cursor-pointer rounded-xs"
-                    >
-                      {isLoading ? (
-                        <>
-                          <RefreshCw className="w-5 h-5 animate-spin" />
-                          <span>ĐANG XỬ LÝ...</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>{activeTab === 'login' ? 'TIẾP TỤC DẠO PHỐ' : 'GIA NHẬP STREET CLUB'}</span>
-                          <ArrowRight className="w-5 h-5" />
-                        </>
+                      <div className="text-center pt-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsForgotPassword(false);
+                            setError('');
+                            setSuccessMessage('');
+                          }}
+                          className="text-xs text-white/50 hover:text-white hover:underline transition-colors font-mono tracking-wider uppercase"
+                        >
+                          ← QUAY LẠI ĐĂNG NHẬP
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <form onSubmit={handleEmailAuth} className="space-y-4">
+                      {activeTab === 'register' && (
+                        <div className="space-y-1.5">
+                          <label className="block text-[10px] font-mono uppercase text-white/50 tracking-wider">Tên hiển thị / Nickname</label>
+                          <div className="relative">
+                            <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                            <input
+                              type="text"
+                              required
+                              placeholder="vd: Minh Streetwear"
+                              value={displayName}
+                              onChange={(e) => setDisplayName(e.target.value)}
+                              className="w-full bg-denim-dark border border-white/10 text-white pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-mustard transition-colors rounded-xs"
+                            />
+                          </div>
+                        </div>
                       )}
-                    </button>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-[10px] font-mono uppercase text-white/50 tracking-wider">Địa chỉ Email</label>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                          <input
+                            type="email"
+                            required
+                            placeholder="ten@email.com"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            className="w-full bg-denim-dark border border-white/10 text-white pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-mustard transition-colors rounded-xs"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between items-center">
+                          <label className="block text-[10px] font-mono uppercase text-white/50 tracking-wider">Mật khẩu bảo mật</label>
+                          {activeTab === 'login' && (
+                            <button 
+                              type="button" 
+                              onClick={() => {
+                                setIsForgotPassword(true);
+                                setError('');
+                                setSuccessMessage('');
+                              }} 
+                              className="text-[10px] text-mustard hover:underline font-mono"
+                            >
+                              QUÊN MẬT KHẨU?
+                            </button>
+                          )}
+                        </div>
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                          <input
+                            type="password"
+                            required
+                            placeholder="••••••••"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            className="w-full bg-denim-dark border border-white/10 text-white pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-mustard transition-colors rounded-xs"
+                          />
+                        </div>
+                      </div>
+
+                      {activeTab === 'register' && (
+                        <label className="flex items-start space-x-2 pt-1 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={agreeTerms}
+                            onChange={(e) => setAgreeTerms(e.target.checked)}
+                            className="mt-0.5 rounded-sm border-white/15 bg-black text-mustard focus:ring-0 focus:ring-offset-0"
+                          />
+                          <span className="text-[11px] text-white/60 leading-relaxed font-light">
+                            Tôi đồng ý với chính sách thu gom, chia sẻ dữ liệu cộng đồng và điều khoản thành viên của ECHOVE Studio.
+                          </span>
+                        </label>
+                      )}
+
+                      {/* Submit Button */}
+                      <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full bg-mustard hover:bg-mustard/90 text-denim-dark font-display font-black text-lg tracking-widest py-3 flex items-center justify-center space-x-2 transition-all cursor-pointer rounded-xs"
+                      >
+                        {isLoading ? (
+                          <>
+                            <RefreshCw className="w-5 h-5 animate-spin" />
+                            <span>ĐANG XỬ LÝ...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>{activeTab === 'login' ? 'TIẾP TỤC DẠO PHỐ' : 'GIA NHẬP STREET CLUB'}</span>
+                            <ArrowRight className="w-5 h-5" />
+                          </>
+                        )}
+                      </button>
 
                     {/* Admin Quick Login Shortcut */}
                     {activeTab === 'login' && (
@@ -331,6 +483,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
                       </button>
                     )}
                   </form>
+                  )}
 
                   {/* Social Divisor */}
                   <div className="relative flex py-2 items-center text-xs font-mono text-white/20">

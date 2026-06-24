@@ -64,7 +64,7 @@ export default function Community() {
                 </div>
                 
                 <a 
-                  href="https://instagram.com/echove.studio" 
+                  href="https://instagram.com/echove.official" 
                   target="_blank" 
                   rel="noreferrer"
                   className="text-white/40 hover:text-mustard"
@@ -123,7 +123,7 @@ export default function Community() {
             KHOE STREET STYLE ĐỘC BẢN CỦA BẠN
           </h3>
           <p className="font-sans text-xs sm:text-sm text-white/75 max-w-xl mx-auto leading-relaxed font-light">
-            Tag tụi mình <strong className="text-white hover:text-mustard">@echove.studio</strong> kèm hashtag <span className="text-mustard font-semibold">#echovestreetstyle</span> trên Instagram/TikTok dạo phố của bạn. Những tấm ảnh cool nhất sẽ được tụi mình chọn đăng và tặng kèm voucher mua đồ dạo phố tiếp theo nhé!
+            Tag tụi mình <strong className="text-white hover:text-mustard">@echove.official</strong> kèm hashtag <span className="text-mustard font-semibold">#echovestreetstyle</span> trên Instagram/TikTok dạo phố của bạn. Những tấm ảnh cool nhất sẽ được tụi mình chọn đăng và tặng kèm voucher mua đồ dạo phố tiếp theo nhé!
           </p>
         </div>
 

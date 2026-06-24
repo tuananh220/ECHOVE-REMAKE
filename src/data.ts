@@ -180,7 +180,7 @@ export const COMMUNITY_FEEDS = [
   },
   {
     id: 3,
-    username: '@echove.studio',
+    username: '@echove.official',
     location: 'ECHOVE Lab',
     image: 'https://picsum.photos/seed/community3/500/600',
     caption: 'Góc xưởng nhỏ bận rộn ngày cuối tuần. Hàng trăm chiếc quần jeans quyên góp từ đợt vừa rồi đang được tụi mình phân loại, giặt giũ khử trùng chuẩn bị cho BST Reborn tiếp theo! Thân gửi ngàn lời yêu thương đến các donor.',

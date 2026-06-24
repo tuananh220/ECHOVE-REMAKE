@@ -13,7 +13,7 @@ import AdminDashboard from './components/AdminDashboard';
 import { PRODUCTS } from './data';
 import { Product, CartItem, User } from './types';
 import AuthModal from './components/AuthModal';
-import { Sparkles, MapPin, Instagram, Mail, Phone, ChevronRight } from 'lucide-react';
+import { Sparkles, MapPin, Instagram, Mail, Phone, ChevronRight, Facebook } from 'lucide-react';
 import logo from './assets/logo.svg';
 
 export default function App() {
@@ -319,10 +319,18 @@ export default function App() {
               ECHOVE là thương hiệu thời trang tái chế denim phong cách Urban Streetwear tiên phong tại Việt Nam. Tụi mình thiết kế thủ công các sản phẩm 1-of-1 từ denim cũ quyên góp nhằm lan tỏa lối sống có ý thức và bùng nổ cá tính.
             </p>
             <div className="flex space-x-3 pt-2">
-              <a href="https://instagram.com/echove.studio" target="_blank" rel="noreferrer" className="p-2 bg-white/5 border border-white/10 hover:border-mustard hover:text-mustard transition-all rounded-xs text-white/70">
+              <a href="https://www.facebook.com/echove.official" target="_blank" rel="noreferrer" className="p-2 bg-white/5 border border-white/10 hover:border-mustard hover:text-mustard transition-all rounded-xs text-white/70" title="Facebook">
+                <Facebook className="w-4 h-4" />
+              </a>
+              <a href="https://instagram.com/echove.official" target="_blank" rel="noreferrer" className="p-2 bg-white/5 border border-white/10 hover:border-mustard hover:text-mustard transition-all rounded-xs text-white/70" title="Instagram">
                 <Instagram className="w-4 h-4" />
               </a>
-              <a href="mailto:contact@echove.vn" className="p-2 bg-white/5 border border-white/10 hover:border-mustard hover:text-mustard transition-all rounded-xs text-white/70">
+              <a href="https://tiktok.com/@echove.official" target="_blank" rel="noreferrer" className="p-2 bg-white/5 border border-white/10 hover:border-mustard hover:text-mustard transition-all rounded-xs text-white/70 flex items-center justify-center" title="TikTok">
+                <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                  <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.02 1.59 4.23.95 1.14 2.28 1.89 3.73 2.15v3.91c-1.24-.04-2.49-.37-3.6-.96-.91-.5-1.7-.19-2.31.54-.15.18-.32.35-.5.51v7.69c.04 1.6-.33 3.23-1.14 4.62-.89 1.56-2.31 2.76-4.01 3.32-1.89.65-4.01.54-5.83-.33-1.85-.86-3.32-2.45-3.99-4.39-.73-2.07-.46-4.42.72-6.27.97-1.56 2.51-2.65 4.31-2.99 1.15-.22 2.34-.11 3.44.3v4.06c-.84-.27-1.78-.34-2.62-.07-.71.22-1.35.68-1.76 1.3-.49.71-.62 1.63-.35 2.47.26.85.91 1.54 1.74 1.84.81.3 1.73.22 2.47-.23.63-.37 1.05-.98 1.17-1.71.07-.63.04-1.28.04-1.92V0z" />
+                </svg>
+              </a>
+              <a href="mailto:echove.official@gmail.com" className="p-2 bg-white/5 border border-white/10 hover:border-mustard hover:text-mustard transition-all rounded-xs text-white/70" title="Email">
                 <Mail className="w-4 h-4" />
               </a>
             </div>
@@ -375,7 +383,7 @@ export default function App() {
               </div>
               <div className="flex items-center space-x-2">
                 <Mail className="w-4 h-4 text-orange-earth shrink-0" />
-                <span>Email Lab: hello@echove.vn</span>
+                <span>Email Lab: echove.official@gmail.com</span>
               </div>
             </div>
             
