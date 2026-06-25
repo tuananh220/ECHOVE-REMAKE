@@ -13,7 +13,8 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && (
         request.auth.token.email == 'admin@echove.vn' || 
-        request.auth.token.email == 'echove.official@gmail.com'
+        request.auth.token.email == 'echove.official@gmail.com' ||
+        request.auth.token.email == 'anhnthe171401@fpt.edu.vn'
       );
     }
 

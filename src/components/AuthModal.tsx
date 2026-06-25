@@ -453,36 +453,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }: AuthModal
                           </>
                         )}
                       </button>
-
-                    {/* Admin Quick Login Shortcut */}
-                    {activeTab === 'login' && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEmail('admin@echove.vn');
-                          setPassword('admin123');
-                          setIsLoading(true);
-                          setTimeout(() => {
-                            setIsLoading(false);
-                            const adminUser: User = {
-                              uid: 'admin-uid',
-                              email: 'admin@echove.vn',
-                              displayName: 'ECHOVE Admin',
-                              providerId: 'password',
-                              points: 9999,
-                              role: 'admin'
-                            };
-                            onLoginSuccess(adminUser);
-                            onClose();
-                          }, 800);
-                        }}
-                        className="w-full py-2 px-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 font-mono text-[11px] tracking-wider uppercase border border-red-500/30 rounded-xs flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
-                      >
-                        <Shield className="w-3.5 h-3.5" />
-                        <span>Đăng nhập nhanh Admin (Trải Nghiệm)</span>
-                      </button>
-                    )}
-                  </form>
+                    </form>
                   )}
 
                   {/* Social Divisor */}

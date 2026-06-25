@@ -9,6 +9,7 @@ import Cart from './components/Cart';
 import AboutPage from './components/AboutPage';
 import Community from './components/Community';
 import AdminDashboard from './components/AdminDashboard';
+import TrackingModal from './components/TrackingModal';
 
 import { PRODUCTS } from './data';
 import { Product, CartItem, User } from './types';
@@ -51,6 +52,7 @@ export default function App() {
   // User Authentication States
   const [user, setUser] = useState<User | null>(null);
   const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
+  const [isTrackingOpen, setIsTrackingOpen] = useState<boolean>(false);
 
   // Load cart, user, and products from localStorage on mount
   useEffect(() => {
@@ -149,6 +151,7 @@ export default function App() {
         onSignOut={handleSignOut}
         theme={theme}
         onToggleTheme={handleToggleTheme}
+        onOpenTracking={() => setIsTrackingOpen(true)}
       />
 
       {/* Main Pages Router */}
@@ -430,6 +433,13 @@ export default function App() {
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
         onLoginSuccess={handleLoginSuccess}
+      />
+
+      {/* Tracking Modal Popup */}
+      <TrackingModal
+        isOpen={isTrackingOpen}
+        onClose={() => setIsTrackingOpen(false)}
+        user={user}
       />
 
     </div>

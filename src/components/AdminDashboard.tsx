@@ -2,10 +2,25 @@ import React, { useState, useEffect } from 'react';
 import { 
   ShoppingBag, Users, Gift, Layers, Search, Plus, Trash2, 
   CheckCircle, ArrowRight, RefreshCw, Filter, ShieldAlert, 
-  ChevronRight, Award, Edit3, X, Coins, Eye, TrendingUp, Check, Play
+  ChevronRight, Award, Edit3, X, Coins, Eye, TrendingUp, Check, Play,
+  Tag, Mail, Settings, Calendar, DollarSign, Percent, ToggleLeft, ToggleRight, Sparkles
 } from 'lucide-react';
-import { Product, Order, DonationSubmission, User } from '../types';
+import { Product, Order, DonationSubmission, User, Voucher, EmailConfig, EmailLog } from '../types';
 import { PRODUCTS } from '../data';
+import { 
+  getAllOrders, 
+  getAllDonations, 
+  getAllUsers, 
+  updateOrderStatus, 
+  updateDonationStatus, 
+  rewardMemberPoints,
+  getAllVouchers,
+  createVoucher,
+  deleteVoucher,
+  getEmailConfig,
+  saveEmailConfig,
+  getAllEmailLogs
+} from '../firebase';
 
 interface AdminDashboardProps {
   user: User | null;
@@ -13,13 +28,37 @@ interface AdminDashboardProps {
 }
 
 export default function AdminDashboard({ user, onProductUpdate }: AdminDashboardProps) {
-  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'donations' | 'users'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'donations' | 'users' | 'vouchers' | 'emails'>('orders');
   
   // Data States
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [donations, setDonations] = useState<DonationSubmission[]>([]);
   const [members, setMembers] = useState<User[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(false);
+
+  // Voucher states
+  const [vouchers, setVouchers] = useState<Voucher[]>([]);
+  const [isAddVoucherOpen, setIsAddVoucherOpen] = useState(false);
+  const [newVoucherId, setNewVoucherId] = useState('');
+  const [newVoucherDesc, setNewVoucherDesc] = useState('');
+  const [newVoucherType, setNewVoucherType] = useState<'percentage' | 'fixed'>('fixed');
+  const [newVoucherValue, setNewVoucherValue] = useState<number>(50000);
+  const [newVoucherMinOrder, setNewVoucherMinOrder] = useState<number>(200000);
+  const [newVoucherExpiry, setNewVoucherExpiry] = useState<string>('2026-12-31');
+  const [newVoucherLimit, setNewVoucherLimit] = useState<number | undefined>(undefined);
+  const [isSavingVoucher, setIsSavingVoucher] = useState(false);
+
+  // Email states
+  const [emailLogs, setEmailLogs] = useState<EmailLog[]>([]);
+  const [emailConfig, setEmailConfig] = useState<EmailConfig>({
+    serviceId: '',
+    templateId: '',
+    publicKey: '',
+    isEnabled: false
+  });
+  const [isSavingEmailConfig, setIsSavingEmailConfig] = useState(false);
+  const [viewingEmailBody, setViewingEmailBody] = useState<string | null>(null);
 
   // Search & Filter States
   const [searchTerm, setSearchTerm] = useState('');
@@ -48,79 +87,214 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
     membersCount: 0
   });
 
-  // Load all data from LocalStorage
+  // Load all data from Firestore (real-time) with LocalStorage fallback
   useEffect(() => {
-    // 1. Orders
-    const savedOrders = localStorage.getItem('echove_orders');
-    const orderData: Order[] = savedOrders ? JSON.parse(savedOrders) : [];
-    setOrders(orderData);
+    async function loadAllData() {
+      if (!user || user.role !== 'admin') return;
+      
+      setIsLoadingData(true);
+      try {
+        // 1. Fetch Orders
+        const firestoreOrders = await getAllOrders();
+        const savedOrders = localStorage.getItem('echove_orders');
+        const localOrders: Order[] = savedOrders ? JSON.parse(savedOrders) : [];
+        
+        // Merge and uniquely identify by ID
+        const unifiedOrders = new Map<string, Order>();
+        firestoreOrders.forEach(o => unifiedOrders.set(o.id, o));
+        localOrders.forEach(o => {
+          if (!unifiedOrders.has(o.id)) {
+            unifiedOrders.set(o.id, o);
+            // Save local-only ones to firestore
+            import('../firebase').then(m => m.createOrder(o));
+          }
+        });
+        const orderList = Array.from(unifiedOrders.values()).sort(
+          (a, b) => b.id.localeCompare(a.id)
+        );
+        setOrders(orderList);
+        localStorage.setItem('echove_orders', JSON.stringify(orderList));
 
-    // 2. Products
-    const savedProducts = localStorage.getItem('echove_products');
-    const productData: Product[] = savedProducts ? JSON.parse(savedProducts) : PRODUCTS;
-    setProducts(productData);
+        // 2. Fetch Products
+        const savedProducts = localStorage.getItem('echove_products');
+        const productData: Product[] = savedProducts ? JSON.parse(savedProducts) : PRODUCTS;
+        setProducts(productData);
 
-    // 3. Donations
-    const savedDonations = localStorage.getItem('echove_donations');
-    const donationData: DonationSubmission[] = savedDonations ? JSON.parse(savedDonations) : [];
-    setDonations(donationData);
+        // 3. Fetch Donations
+        const firestoreDonations = await getAllDonations();
+        const savedDonations = localStorage.getItem('echove_donations');
+        const localDonations: DonationSubmission[] = savedDonations ? JSON.parse(savedDonations) : [];
+        
+        const unifiedDonations = new Map<string, DonationSubmission>();
+        firestoreDonations.forEach(d => unifiedDonations.set(d.id, d));
+        localDonations.forEach(d => {
+          if (!unifiedDonations.has(d.id)) {
+            unifiedDonations.set(d.id, d);
+            import('../firebase').then(m => m.createDonation(d));
+          }
+        });
+        const donationList = Array.from(unifiedDonations.values()).sort(
+          (a, b) => b.id.localeCompare(a.id)
+        );
+        setDonations(donationList);
+        localStorage.setItem('echove_donations', JSON.stringify(donationList));
 
-    // 4. Members
-    const savedUsers = localStorage.getItem('echove_all_registered_users');
-    let usersData: User[] = savedUsers ? JSON.parse(savedUsers) : [];
-    
-    // Add default mock members if empty
-    if (usersData.length === 0) {
-      usersData = [
-        {
-          uid: 'social-1',
-          email: 'minh.streetwear@gmail.com',
-          displayName: 'Minh Streetwear',
-          providerId: 'google',
-          points: 150,
-          role: 'user'
-        },
-        {
-          uid: 'social-2',
-          email: 'vy.upcycled@gmail.com',
-          displayName: 'Vy Denim',
-          providerId: 'instagram',
-          points: 240,
-          role: 'user'
-        },
-        {
-          uid: 'social-3',
-          email: 'hai.vintage@gmail.com',
-          displayName: 'Hải Vintage',
-          providerId: 'facebook',
-          points: 420,
-          role: 'user'
-        },
-        {
-          uid: 'admin-uid',
-          email: 'admin@echove.vn',
-          displayName: 'ECHOVE Admin',
-          providerId: 'password',
-          points: 9999,
-          role: 'admin'
-        }
-      ];
-      localStorage.setItem('echove_all_registered_users', JSON.stringify(usersData));
+        // 4. Fetch Registered Members from Firestore
+        const firestoreUsers = await getAllUsers();
+        // Since we want mock ones to also be there for rich visuals if they are not signed up yet:
+        const defaultMockUsers: User[] = [
+          {
+            uid: 'social-1',
+            email: 'minh.streetwear@gmail.com',
+            displayName: 'Minh Streetwear',
+            providerId: 'google',
+            points: 150,
+            role: 'user'
+          },
+          {
+            uid: 'social-2',
+            email: 'vy.upcycled@gmail.com',
+            displayName: 'Vy Denim',
+            providerId: 'instagram',
+            points: 240,
+            role: 'user'
+          },
+          {
+            uid: 'social-3',
+            email: 'hai.vintage@gmail.com',
+            displayName: 'Hải Vintage',
+            providerId: 'facebook',
+            points: 420,
+            role: 'user'
+          }
+        ];
+        
+        const unifiedMembers = new Map<string, User>();
+        // Add defaults first
+        defaultMockUsers.forEach(m => unifiedMembers.set(m.email.toLowerCase(), m));
+        // Overwrite/add real registered users from Firestore
+        firestoreUsers.forEach(u => unifiedMembers.set(u.email.toLowerCase(), u));
+        
+        const memberList = Array.from(unifiedMembers.values());
+        setMembers(memberList);
+        localStorage.setItem('echove_all_registered_users', JSON.stringify(memberList));
+
+        // Calculate Stats
+        const totalSales = orderList
+          .filter(o => o.status === 'completed' || o.status === 'shipping' || o.status === 'confirmed')
+          .reduce((sum, o) => sum + o.totalPrice, 0);
+
+        setStats({
+          totalSales,
+          ordersCount: orderList.length,
+          donationsCount: donationList.length,
+          membersCount: memberList.filter(u => u.role !== 'admin').length
+        });
+      } catch (err) {
+        console.error("Error loading cloud admin data:", err);
+      } finally {
+        setIsLoadingData(false);
+      }
     }
-    setMembers(usersData);
+    loadAllData();
+  }, [user]);
 
-    // Calculate Stats
-    const totalSales = orderData
-      .filter(o => o.status === 'completed' || o.status === 'shipping' || o.status === 'confirmed')
-      .reduce((sum, o) => sum + o.totalPrice, 0);
+  // Load Vouchers and Email logs
+  useEffect(() => {
+    async function loadVouchersAndEmails() {
+      if (!user || user.role !== 'admin') return;
+      try {
+        const list = await getAllVouchers();
+        setVouchers(list);
+        
+        const logs = await getAllEmailLogs();
+        setEmailLogs(logs);
+        
+        const config = await getEmailConfig();
+        setEmailConfig(config);
+      } catch (err) {
+        console.error("Error loading vouchers or email settings:", err);
+      }
+    }
+    loadVouchersAndEmails();
+  }, [user, activeTab]);
 
-    setStats({
-      totalSales,
-      ordersCount: orderData.length,
-      donationsCount: donationData.length,
-      membersCount: usersData.filter(u => u.role !== 'admin').length
-    });
-  }, []);
+  const handleCreateVoucherSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newVoucherId.trim() || !newVoucherDesc.trim()) {
+      alert('Vui lòng điền mã và mô tả voucher!');
+      return;
+    }
+
+    setIsSavingVoucher(true);
+    try {
+      const voucher: Voucher = {
+        id: newVoucherId.toUpperCase().trim(),
+        description: newVoucherDesc,
+        discountType: newVoucherType,
+        discountValue: newVoucherValue,
+        minOrderValue: newVoucherMinOrder,
+        expiryDate: newVoucherExpiry,
+        usageLimit: newVoucherLimit,
+        usageCount: 0,
+        isActive: true,
+        createdAt: new Date().toISOString()
+      };
+
+      await createVoucher(voucher);
+      setVouchers(prev => [voucher, ...prev]);
+      
+      // Reset
+      setNewVoucherId('');
+      setNewVoucherDesc('');
+      setNewVoucherValue(50000);
+      setNewVoucherMinOrder(200000);
+      setNewVoucherLimit(undefined);
+      setIsAddVoucherOpen(false);
+      alert('Tạo mã voucher thành công trên Firestore! 🎉');
+    } catch (err) {
+      console.error('Error creating voucher:', err);
+      alert('Có lỗi xảy ra khi tạo voucher.');
+    } finally {
+      setIsSavingVoucher(false);
+    }
+  };
+
+  const handleDeleteVoucher = async (id: string) => {
+    if (!confirm(`Bạn có chắc chắn muốn xóa mã giảm giá ${id} này không?`)) return;
+    try {
+      await deleteVoucher(id);
+      setVouchers(prev => prev.filter(v => v.id !== id));
+      alert('Xóa voucher thành công!');
+    } catch (err) {
+      console.error('Error deleting voucher:', err);
+      alert('Xóa voucher thất bại.');
+    }
+  };
+
+  const handleToggleVoucherStatus = async (voucher: Voucher) => {
+    try {
+      const updatedVoucher = { ...voucher, isActive: !voucher.isActive };
+      await createVoucher(updatedVoucher);
+      setVouchers(prev => prev.map(v => v.id === voucher.id ? updatedVoucher : v));
+    } catch (err) {
+      console.error('Error updating voucher status:', err);
+    }
+  };
+
+  const handleSaveEmailConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingEmailConfig(true);
+    try {
+      await saveEmailConfig(emailConfig);
+      alert('Cấu hình EmailJS đã được cập nhật thành công lên Firestore! 📩');
+    } catch (err) {
+      console.error('Error saving email config:', err);
+      alert('Cấu hình EmailJS thất bại.');
+    } finally {
+      setIsSavingEmailConfig(false);
+    }
+  };
 
   // Save changes to localStorage helper functions
   const saveOrders = (updatedOrders: Order[]) => {
@@ -155,7 +329,7 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
   };
 
   // Actions
-  const handleUpdateOrderStatus = (orderId: string, newStatus: Order['status']) => {
+  const handleUpdateOrderStatus = async (orderId: string, newStatus: Order['status']) => {
     const updated = orders.map(o => {
       if (o.id === orderId) {
         return { ...o, status: newStatus };
@@ -163,9 +337,16 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
       return o;
     });
     saveOrders(updated);
+
+    // Save to Firestore
+    try {
+      await updateOrderStatus(orderId, newStatus);
+    } catch (err) {
+      console.error("Error updating order status in Firestore:", err);
+    }
   };
 
-  const handleUpdateDonationStatus = (donationId: string, newStatus: DonationSubmission['status']) => {
+  const handleUpdateDonationStatus = async (donationId: string, newStatus: DonationSubmission['status']) => {
     const updated = donations.map(d => {
       if (d.id === donationId) {
         return { ...d, status: newStatus };
@@ -173,9 +354,16 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
       return d;
     });
     saveDonations(updated);
+
+    // Save to Firestore
+    try {
+      await updateDonationStatus(donationId, newStatus);
+    } catch (err) {
+      console.error("Error updating donation status in Firestore:", err);
+    }
   };
 
-  const handleRewardMemberPoints = (memberEmail: string, pointsToAdd: number) => {
+  const handleRewardMemberPoints = async (memberEmail: string, pointsToAdd: number) => {
     const updated = members.map(m => {
       if (m.email.toLowerCase() === memberEmail.toLowerCase()) {
         const currentPoints = m.points || 0;
@@ -184,6 +372,13 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
       return m;
     });
     saveMembers(updated);
+
+    // Update in Firestore
+    try {
+      await rewardMemberPoints(memberEmail, pointsToAdd);
+    } catch (err) {
+      console.error("Error rewarding points in Firestore:", err);
+    }
     alert(`Đã cộng thành công ${pointsToAdd} PTS cho thành viên ${memberEmail}!`);
   };
 
@@ -271,8 +466,8 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
           </p>
         </div>
         <div className="pt-2">
-          <span className="font-mono text-xs text-mustard bg-mustard/10 px-3 py-1.5 border border-mustard/20 rounded-xs">
-            Mẹo: Dùng email "admin@echove.vn" hoặc nút Đăng nhập nhanh Admin ở cửa sổ đăng nhập!
+          <span className="font-mono text-xs text-mustard bg-mustard/10 px-3 py-1.5 border border-mustard/20 rounded-xs uppercase tracking-wider">
+            Vui lòng liên hệ nhà phát triển nếu bạn quên mật khẩu quản trị viên.
           </span>
         </div>
       </div>
@@ -393,6 +588,30 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
             <Users className="w-4 h-4" />
             <span>THÀNH VIÊN</span>
           </button>
+
+          <button
+            onClick={() => { setActiveTab('vouchers'); setSearchTerm(''); }}
+            className={`px-4 py-2 text-xs sm:text-sm font-display tracking-widest uppercase transition-colors rounded-xs flex items-center space-x-2 border cursor-pointer ${
+              activeTab === 'vouchers'
+                ? 'bg-mustard text-denim-dark border-mustard font-black'
+                : 'border-transparent text-white/60 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Tag className="w-4 h-4" />
+            <span>VOUCHER</span>
+          </button>
+
+          <button
+            onClick={() => { setActiveTab('emails'); setSearchTerm(''); }}
+            className={`px-4 py-2 text-xs sm:text-sm font-display tracking-widest uppercase transition-colors rounded-xs flex items-center space-x-2 border cursor-pointer ${
+              activeTab === 'emails'
+                ? 'bg-mustard text-denim-dark border-mustard font-black'
+                : 'border-transparent text-white/60 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Mail className="w-4 h-4" />
+            <span>HỘM THƯ</span>
+          </button>
         </div>
 
         {/* Filters and Inputs bar */}
@@ -406,6 +625,8 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
                 activeTab === 'orders' ? 'Tìm đơn hàng theo tên, SĐT hoặc mã đơn...' :
                 activeTab === 'products' ? 'Tìm sản phẩm theo tên hoặc phân loại...' :
                 activeTab === 'donations' ? 'Tìm phiếu gửi đồ theo tên hoặc SĐT...' :
+                activeTab === 'vouchers' ? 'Tìm voucher theo mã code...' :
+                activeTab === 'emails' ? 'Tìm nhật ký thư theo email nhận...' :
                 'Tìm thành viên theo tên hoặc email...'
               }
               value={searchTerm}
@@ -439,6 +660,16 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
             >
               <Plus className="w-4 h-4" />
               <span>THÊM SẢN PHẨM</span>
+            </button>
+          )}
+
+          {activeTab === 'vouchers' && (
+            <button
+              onClick={() => setIsAddVoucherOpen(true)}
+              className="bg-orange-earth hover:bg-orange-earth/90 text-white px-4 py-2 text-xs sm:text-sm font-display font-black tracking-widest uppercase flex items-center justify-center space-x-1.5 transition-colors cursor-pointer rounded-xs self-start sm:self-auto"
+            >
+              <Plus className="w-4 h-4" />
+              <span>TẠO VOUCHER</span>
             </button>
           )}
         </div>
@@ -815,6 +1046,243 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
           </div>
         )}
 
+        {/* TAB 5: VOUCHERS MANAGEMENT */}
+        {activeTab === 'vouchers' && (
+          <div className="bg-[#1C1E22] border border-white/10 rounded-xs overflow-hidden">
+            <div className="p-4 bg-[#0F1012] border-b border-white/5 flex justify-between items-center">
+              <div>
+                <h3 className="font-display font-bold text-sm tracking-widest text-white uppercase flex items-center space-x-2">
+                  <Tag className="w-4 h-4 text-mustard" />
+                  <span>DANH SÁCH MÃ GIẢM GIÁ (FIRESTORE)</span>
+                </h3>
+                <p className="text-[10px] font-mono text-white/40 mt-1 uppercase">Các mã giảm giá này áp dụng trực tiếp tại giỏ hàng</p>
+              </div>
+            </div>
+            
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                <thead>
+                  <tr className="border-b border-white/10 bg-[#0F1012] font-mono text-[10px] uppercase text-white/40 tracking-wider">
+                    <th className="p-4">Mã Code</th>
+                    <th className="p-4">Mô tả</th>
+                    <th className="p-4 text-center">Trị giá</th>
+                    <th className="p-4 text-center">Đơn tối thiểu</th>
+                    <th className="p-4 text-center">Hạn dùng</th>
+                    <th className="p-4 text-center">Đã dùng / Giới hạn</th>
+                    <th className="p-4 text-center">Trạng thái</th>
+                    <th className="p-4 text-right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5 font-sans">
+                  {vouchers.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="p-8 text-center text-white/40 font-mono text-xs uppercase">
+                        Chưa có voucher nào được tạo trên hệ thống. Ấn nút "Tạo Voucher" để thêm mới!
+                      </td>
+                    </tr>
+                  ) : (
+                    vouchers
+                      .filter(v => v.id.toLowerCase().includes(searchTerm.toLowerCase()))
+                      .map((voucher) => (
+                        <tr key={voucher.id} className="hover:bg-white/[0.02] transition-colors">
+                          <td className="p-4 font-mono font-black text-mustard tracking-wider uppercase text-sm">
+                            {voucher.id}
+                          </td>
+                          <td className="p-4 text-white text-xs max-w-[180px] truncate" title={voucher.description}>
+                            {voucher.description}
+                          </td>
+                          <td className="p-4 text-center font-mono font-bold text-white">
+                            {voucher.discountType === 'percentage' ? `${voucher.discountValue}%` : `${voucher.discountValue.toLocaleString('vi-VN')}đ`}
+                          </td>
+                          <td className="p-4 text-center font-mono text-white/70">
+                            {voucher.minOrderValue.toLocaleString('vi-VN')}đ
+                          </td>
+                          <td className="p-4 text-center font-mono text-white/60">
+                            {voucher.expiryDate}
+                          </td>
+                          <td className="p-4 text-center font-mono text-white/70">
+                            {voucher.usageCount} / {voucher.usageLimit !== undefined ? voucher.usageLimit : '∞'}
+                          </td>
+                          <td className="p-4 text-center">
+                            <button
+                              onClick={() => handleToggleVoucherStatus(voucher)}
+                              className={`inline-flex items-center space-x-1 px-2.5 py-1 text-[10px] font-mono font-bold uppercase border rounded-full transition-colors cursor-pointer ${
+                                voucher.isActive
+                                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                  : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                              }`}
+                            >
+                              {voucher.isActive ? 'ĐANG BẬT' : 'ĐÃ TẮT'}
+                            </button>
+                          </td>
+                          <td className="p-4 text-right">
+                            <button
+                              onClick={() => handleDeleteVoucher(voucher.id)}
+                              className="text-white/40 hover:text-red-400 p-2 hover:bg-white/5 rounded-xs transition-colors"
+                              title="Xóa voucher"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 6: EMAIL CONFIG & LOGS */}
+        {activeTab === 'emails' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* EMAILJS CREDENTIALS CONFIG */}
+            <div className="bg-[#1C1E22] border border-white/10 rounded-xs p-5 space-y-4 lg:col-span-1 h-fit text-xs">
+              <div className="border-b border-white/5 pb-2">
+                <h3 className="font-display font-black text-sm tracking-widest text-white uppercase flex items-center space-x-2">
+                  <Settings className="w-4 h-4 text-mustard" />
+                  <span>CẤU HÌNH EMAILJS</span>
+                </h3>
+                <p className="text-[10px] font-mono text-white/40 mt-1 uppercase">Kết nối API gửi thư tự động</p>
+              </div>
+
+              <form onSubmit={handleSaveEmailConfig} className="space-y-4 font-sans">
+                <div className="space-y-1.5">
+                  <label className="font-display tracking-wider text-white/70 uppercase text-[10px]">SERVICE ID</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. service_xxxxxxx"
+                    value={emailConfig.serviceId}
+                    onChange={(e) => setEmailConfig(prev => ({ ...prev, serviceId: e.target.value }))}
+                    className="w-full bg-[#0F1012] border border-white/10 px-3 py-2 text-white text-xs font-mono rounded-xs focus:outline-none focus:border-mustard"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-display tracking-wider text-white/70 uppercase text-[10px]">TEMPLATE ID</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. template_xxxxxxx"
+                    value={emailConfig.templateId}
+                    onChange={(e) => setEmailConfig(prev => ({ ...prev, templateId: e.target.value }))}
+                    className="w-full bg-[#0F1012] border border-white/10 px-3 py-2 text-white text-xs font-mono rounded-xs focus:outline-none focus:border-mustard"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="font-display tracking-wider text-white/70 uppercase text-[10px]">PUBLIC KEY (USER ID)</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. user_xxxxxxxxxxxx"
+                    value={emailConfig.publicKey}
+                    onChange={(e) => setEmailConfig(prev => ({ ...prev, publicKey: e.target.value }))}
+                    className="w-full bg-[#0F1012] border border-white/10 px-3 py-2 text-white text-xs font-mono rounded-xs focus:outline-none focus:border-mustard"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between py-2 border-y border-white/5">
+                  <span className="font-display tracking-wider text-white/70 uppercase text-[10px]">Trạng thái hệ thống</span>
+                  <button
+                    type="button"
+                    onClick={() => setEmailConfig(prev => ({ ...prev, isEnabled: !prev.isEnabled }))}
+                    className="flex items-center focus:outline-none"
+                  >
+                    {emailConfig.isEnabled ? (
+                      <ToggleRight className="w-10 h-10 text-mustard cursor-pointer" />
+                    ) : (
+                      <ToggleLeft className="w-10 h-10 text-white/30 cursor-pointer" />
+                    )}
+                  </button>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSavingEmailConfig}
+                  className="w-full bg-mustard hover:bg-mustard/90 text-denim-dark font-display font-black tracking-widest py-3 text-xs rounded-xs transition-colors cursor-pointer uppercase"
+                >
+                  {isSavingEmailConfig ? 'ĐANG LƯU...' : 'LƯU CẤU HÌNH KẾT NỐI'}
+                </button>
+              </form>
+            </div>
+
+            {/* TRANSACTON MAIL LOGS */}
+            <div className="bg-[#1C1E22] border border-white/10 rounded-xs overflow-hidden lg:col-span-2 text-xs">
+              <div className="p-4 bg-[#0F1012] border-b border-white/5">
+                <h3 className="font-display font-black text-sm tracking-widest text-white uppercase flex items-center space-x-2">
+                  <Mail className="w-4 h-4 text-mustard" />
+                  <span>NHẬT KÝ THƯ GIAO DỊCH (OUTBOX)</span>
+                </h3>
+                <p className="text-[10px] font-mono text-white/40 mt-1 uppercase">Các email tự động được phát sinh từ hệ thống</p>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                  <thead>
+                    <tr className="border-b border-white/10 bg-[#0F1012] font-mono text-[10px] uppercase text-white/40 tracking-wider">
+                      <th className="p-4">Người Nhận</th>
+                      <th className="p-4">Email</th>
+                      <th className="p-4 text-center">Sự Kiện</th>
+                      <th className="p-4 text-center">Kết Quả</th>
+                      <th className="p-4 text-center">Thời Gian</th>
+                      <th className="p-4 text-right">Chi Tiết</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5 font-sans">
+                    {emailLogs.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="p-8 text-center text-white/40 font-mono text-xs uppercase">
+                          Chưa phát sinh lượt gửi email giao dịch nào.
+                        </td>
+                      </tr>
+                    ) : (
+                      emailLogs
+                        .filter(log => log.recipientEmail.toLowerCase().includes(searchTerm.toLowerCase()))
+                        .map((log) => (
+                          <tr key={log.id} className="hover:bg-white/[0.02] transition-colors text-xs">
+                            <td className="p-4 text-white font-medium">{log.recipientName}</td>
+                            <td className="p-4 font-mono text-white/60">{log.recipientEmail}</td>
+                            <td className="p-4 text-center">
+                              <span className={`px-2 py-0.5 text-[9px] font-mono rounded-full border ${
+                                log.templateType === 'order_confirmation'
+                                  ? 'bg-mustard/10 border-mustard/20 text-mustard'
+                                  : 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400'
+                              }`}>
+                                {log.templateType === 'order_confirmation' ? 'ĐƠN HÀNG' : 'GỬI ĐỒ CŨ'}
+                              </span>
+                            </td>
+                            <td className="p-4 text-center">
+                              <span className={`font-mono text-[9px] font-bold ${
+                                log.status === 'success' ? 'text-emerald-400' : 'text-rose-400'
+                              }`}>
+                                {log.status.toUpperCase()}
+                              </span>
+                            </td>
+                            <td className="p-4 text-center font-mono text-white/40 text-[10px]">
+                              {new Date(log.sentAt).toLocaleString('vi-VN')}
+                            </td>
+                            <td className="p-4 text-right">
+                              <button
+                                onClick={() => setViewingEmailBody(log.emailBody)}
+                                className="text-mustard hover:underline font-mono text-[10px] font-bold uppercase cursor-pointer px-2 py-1 bg-white/5 border border-white/5 rounded-xs"
+                              >
+                                Xem Thư
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        )}
+
       </div>
 
       {/* POPUP MODAL: ADD PRODUCT FORM */}
@@ -1013,6 +1481,168 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
               </div>
 
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP MODAL: CREATE VOUCHER FORM */}
+      {isAddVoucherOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0F1012]/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-[#1C1E22] border border-white/10 rounded-xs overflow-hidden shadow-2xl p-6 relative font-sans text-xs">
+            <button
+              onClick={() => setIsAddVoucherOpen(false)}
+              className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors cursor-pointer p-1"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="border-b border-white/10 pb-3 mb-5">
+              <h2 className="font-display font-black text-xl text-white uppercase tracking-wider flex items-center space-x-2">
+                <Tag className="w-5 h-5 text-mustard" />
+                <span>TẠO MÃ GIẢM GIÁ MỚI</span>
+              </h2>
+              <p className="text-white/40 text-[10px] font-mono uppercase mt-0.5">Lưu thông tin trực tiếp vào Firestore</p>
+            </div>
+
+            <form onSubmit={handleCreateVoucherSubmit} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-mono uppercase text-white/50 tracking-wider">MÃ CODE VOUCHER *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. REBORN15"
+                  value={newVoucherId}
+                  onChange={(e) => setNewVoucherId(e.target.value.toUpperCase())}
+                  className="w-full bg-[#0F1012] border border-white/10 text-white px-3 py-2 text-sm focus:outline-none focus:border-mustard rounded-xs font-mono uppercase"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-mono uppercase text-white/50 tracking-wider">MÔ TẢ CHI TIẾT *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Giảm ngay 15% cho mọi đơn hàng từ 300K"
+                  value={newVoucherDesc}
+                  onChange={(e) => setNewVoucherDesc(e.target.value)}
+                  className="w-full bg-[#0F1012] border border-white/10 text-white px-3 py-2 text-sm focus:outline-none focus:border-mustard rounded-xs"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-mono uppercase text-white/50 tracking-wider">LOẠI GIẢM GIÁ *</label>
+                  <select
+                    value={newVoucherType}
+                    onChange={(e) => setNewVoucherType(e.target.value as any)}
+                    className="w-full bg-[#0F1012] border border-white/10 text-white px-3 py-2 text-sm focus:outline-none focus:border-mustard rounded-xs"
+                  >
+                    <option value="fixed">Số tiền mặt cố định (đ)</option>
+                    <option value="percentage">Phần trăm chiết khấu (%)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-mono uppercase text-white/50 tracking-wider">TRỊ GIÁ GIẢM *</label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    value={newVoucherValue}
+                    onChange={(e) => setNewVoucherValue(Number(e.target.value))}
+                    className="w-full bg-[#0F1012] border border-white/10 text-white px-3 py-2 text-sm focus:outline-none focus:border-mustard rounded-xs font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-mono uppercase text-white/50 tracking-wider">ĐƠN TỐI THIỂU (VNĐ) *</label>
+                  <input
+                    type="number"
+                    required
+                    min={0}
+                    value={newVoucherMinOrder}
+                    onChange={(e) => setNewVoucherMinOrder(Number(e.target.value))}
+                    className="w-full bg-[#0F1012] border border-white/10 text-white px-3 py-2 text-sm focus:outline-none focus:border-mustard rounded-xs font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-mono uppercase text-white/50 tracking-wider">HẠN SỬ DỤNG *</label>
+                  <input
+                    type="date"
+                    required
+                    value={newVoucherExpiry}
+                    onChange={(e) => setNewVoucherExpiry(e.target.value)}
+                    className="w-full bg-[#0F1012] border border-white/10 text-white px-3 py-2 text-sm focus:outline-none focus:border-mustard rounded-xs font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-[10px] font-mono uppercase text-white/50 tracking-wider">GIỚI HẠN LƯỢT DÙNG (Để trống nếu vô hạn)</label>
+                <input
+                  type="number"
+                  placeholder="Vô hạn sử dụng"
+                  value={newVoucherLimit || ''}
+                  onChange={(e) => setNewVoucherLimit(e.target.value ? Number(e.target.value) : undefined)}
+                  className="w-full bg-[#0F1012] border border-white/10 text-white px-3 py-2 text-sm focus:outline-none focus:border-mustard rounded-xs font-mono"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setIsAddVoucherOpen(false)}
+                  className="border border-white/10 hover:border-white/30 text-white font-display text-xs tracking-widest py-3 transition-colors cursor-pointer rounded-xs uppercase text-center"
+                >
+                  HỦY BỎ
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingVoucher}
+                  className="bg-mustard hover:bg-mustard/90 text-denim-dark font-display font-black text-xs tracking-widest py-3 transition-all cursor-pointer rounded-xs uppercase text-center"
+                >
+                  {isSavingVoucher ? 'ĐANG TẠO...' : 'TẠO VOUCHER'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP MODAL: EMAIL LOG BODY VIEWER */}
+      {viewingEmailBody && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0F1012]/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="w-full max-w-2xl bg-[#1C1E22] border border-white/10 rounded-xs overflow-hidden shadow-2xl p-6 relative font-sans">
+            <button
+              onClick={() => setViewingEmailBody(null)}
+              className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors cursor-pointer p-1"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="border-b border-white/10 pb-3 mb-4">
+              <h2 className="font-display font-black text-lg text-white uppercase tracking-wider flex items-center space-x-2">
+                <Mail className="w-5 h-5 text-mustard" />
+                <span>NỘI DUNG THƯ ĐÃ GỬI</span>
+              </h2>
+              <p className="text-white/40 text-[10px] font-mono uppercase mt-0.5">Nhật ký chi tiết outbox từ hệ thống</p>
+            </div>
+
+            <div className="bg-[#0F1012] border border-white/10 p-4 rounded-xs max-h-[50vh] overflow-y-auto text-xs font-mono text-white/80 leading-relaxed whitespace-pre-wrap">
+              {viewingEmailBody}
+            </div>
+
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={() => setViewingEmailBody(null)}
+                className="bg-white hover:bg-mustard text-denim-dark font-display font-black text-xs tracking-widest px-6 py-2.5 rounded-xs transition-colors cursor-pointer uppercase"
+              >
+                ĐÓNG LẠI
+              </button>
+            </div>
           </div>
         </div>
       )}

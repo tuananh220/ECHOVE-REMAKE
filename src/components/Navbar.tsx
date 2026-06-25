@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShoppingBag, Menu, X, Gift, RefreshCw, LogIn, LogOut, User as UserIcon, Award, Sun, Moon } from 'lucide-react';
+import { ShoppingBag, Menu, X, Gift, RefreshCw, LogIn, LogOut, User as UserIcon, Award, Sun, Moon, Truck } from 'lucide-react';
 import { User } from '../types';
 import logo from '../assets/logo.svg';
 
@@ -13,6 +13,7 @@ interface NavbarProps {
   onSignOut: () => void;
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
+  onOpenTracking: () => void;
 }
 
 export default function Navbar({
@@ -25,6 +26,7 @@ export default function Navbar({
   onSignOut,
   theme,
   onToggleTheme,
+  onOpenTracking,
 }: NavbarProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
@@ -176,12 +178,12 @@ export default function Navbar({
                       <button
                         onClick={() => {
                           setIsUserDropdownOpen(false);
-                          handleNavClick('donor');
+                          onOpenTracking();
                         }}
-                        className="w-full text-left px-3 py-2 text-xs text-white/70 hover:text-white hover:bg-white/5 transition-colors rounded-xs flex items-center space-x-2 cursor-pointer"
+                        className="w-full text-left px-3 py-2 text-xs text-white/70 hover:text-white hover:bg-white/5 transition-colors rounded-xs flex items-center space-x-2 cursor-pointer font-sans"
                       >
-                        <Gift className="w-4 h-4 text-orange-earth" />
-                        <span>Xem trạng thái thu gom</span>
+                        <Truck className="w-4 h-4 text-mustard" />
+                        <span>Theo dõi Đơn & Quyên góp</span>
                       </button>
                       <button
                         onClick={() => {
@@ -276,6 +278,19 @@ export default function Navbar({
                 <Gift className="w-5 h-5" />
                 <span>GỬI TẶNG JEAN CŨ</span>
               </button>
+
+              {user && (
+                <button
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    onOpenTracking();
+                  }}
+                  className="w-full flex items-center justify-center space-x-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-display text-lg tracking-widest py-3 rounded-xs"
+                >
+                  <Truck className="w-5 h-5 text-mustard" />
+                  <span>THEO DÕI ĐƠN & ĐỒ TẶNG</span>
+                </button>
+              )}
 
               {user ? (
                 <button

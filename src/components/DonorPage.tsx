@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Gift, Sparkles, MapPin, CheckCircle, Truck, PackageCheck, Info, Layers, RefreshCw } from 'lucide-react';
 import { DonationSubmission, User } from '../types';
+import { createDonation, getUserDonations } from '../firebase';
+import { sendAutomaticEmail } from '../emailService';
 
 interface DonorPageProps {
   user?: User | null;
@@ -17,6 +19,7 @@ export default function DonorPage({ user = null }: DonorPageProps) {
   const [submissions, setSubmissions] = useState<DonationSubmission[]>([]);
   const [isSuccess, setIsSuccess] = useState(false);
   const [proposalText, setProposalText] = useState('');
+  const [isLoadingList, setIsLoadingList] = useState(false);
 
   // Prefill details if user changes
   useEffect(() => {
@@ -26,13 +29,47 @@ export default function DonorPage({ user = null }: DonorPageProps) {
     }
   }, [user]);
 
-  // Loaded from localStorage on mount
+  // Load from Firestore if user is logged in, else load from localStorage
   useEffect(() => {
-    const localDonations = localStorage.getItem('echove_donations');
-    if (localDonations) {
-      setSubmissions(JSON.parse(localDonations));
+    async function loadDonations() {
+      if (user && user.email) {
+        setIsLoadingList(true);
+        try {
+          const firestoreDonations = await getUserDonations(user.email);
+          // Sync/Merge with any unsaved local donations
+          const localDonationsStr = localStorage.getItem('echove_donations');
+          const localDonations: DonationSubmission[] = localDonationsStr ? JSON.parse(localDonationsStr) : [];
+          
+          // Create a unified list with unique IDs
+          const unifiedMap = new Map<string, DonationSubmission>();
+          firestoreDonations.forEach(d => unifiedMap.set(d.id, d));
+          localDonations.forEach(d => {
+            if (!unifiedMap.has(d.id)) {
+              unifiedMap.set(d.id, d);
+              // Proactively save to firestore as well
+              createDonation(d, user.uid);
+            }
+          });
+          
+          const sortedList = Array.from(unifiedMap.values()).sort(
+            (a, b) => b.id.localeCompare(a.id)
+          );
+          setSubmissions(sortedList);
+          localStorage.setItem('echove_donations', JSON.stringify(sortedList));
+        } catch (err) {
+          console.error("Error loading user donations:", err);
+        } finally {
+          setIsLoadingList(false);
+        }
+      } else {
+        const localDonations = localStorage.getItem('echove_donations');
+        if (localDonations) {
+          setSubmissions(JSON.parse(localDonations));
+        }
+      }
     }
-  }, []);
+    loadDonations();
+  }, [user]);
 
   // Update proposal text dynamically based on form changes
   useEffect(() => {
@@ -49,7 +86,7 @@ export default function DonorPage({ user = null }: DonorPageProps) {
     setProposalText(output);
   }, [condition, jeansCount]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!donorName || !phone || !email || !address) {
@@ -74,6 +111,20 @@ export default function DonorPage({ user = null }: DonorPageProps) {
     const updated = [newDonation, ...submissions];
     setSubmissions(updated);
     localStorage.setItem('echove_donations', JSON.stringify(updated));
+
+    // Save to Firestore
+    try {
+      await createDonation(newDonation, user?.uid || undefined);
+    } catch (err) {
+      console.error("Error saving donation to cloud:", err);
+    }
+
+    // Trigger Automatic Email
+    try {
+      await sendAutomaticEmail('donation_received', newDonation.email, newDonation.donorName, newDonation);
+    } catch (err) {
+      console.error("Error sending donation confirmation email:", err);
+    }
 
     // Reset Form
     setDonorName('');
