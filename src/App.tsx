@@ -11,7 +11,6 @@ import Community from './components/Community';
 import AdminDashboard from './components/AdminDashboard';
 import TrackingModal from './components/TrackingModal';
 
-import { PRODUCTS } from './data';
 import { Product, CartItem, User } from './types';
 import AuthModal from './components/AuthModal';
 import { getAllProducts } from './firebase';
@@ -48,7 +47,7 @@ export default function App() {
   }, [theme]);
   
   // Custom Dynamic Products list state
-  const [products, setProducts] = useState<Product[]>(PRODUCTS);
+  const [products, setProducts] = useState<Product[]>([]);
   
   // User Authentication States
   const [user, setUser] = useState<User | null>(null);
@@ -74,7 +73,7 @@ export default function App() {
 
     // Always fetch latest products from Firestore to keep data up to date
     getAllProducts().then((firestoreProducts) => {
-      if (firestoreProducts && firestoreProducts.length > 0) {
+      if (firestoreProducts) {
         setProducts(firestoreProducts);
         localStorage.setItem('echove_products', JSON.stringify(firestoreProducts));
       }
