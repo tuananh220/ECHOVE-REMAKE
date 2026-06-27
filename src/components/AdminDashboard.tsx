@@ -19,7 +19,10 @@ import {
   deleteVoucher,
   getEmailConfig,
   saveEmailConfig,
-  getAllEmailLogs
+  getAllEmailLogs,
+  getAllProducts,
+  createProduct,
+  deleteProduct
 } from '../firebase';
 
 interface AdminDashboardProps {
@@ -116,9 +119,12 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
         localStorage.setItem('echove_orders', JSON.stringify(orderList));
 
         // 2. Fetch Products
-        const savedProducts = localStorage.getItem('echove_products');
-        const productData: Product[] = savedProducts ? JSON.parse(savedProducts) : PRODUCTS;
-        setProducts(productData);
+        const firestoreProducts = await getAllProducts();
+        setProducts(firestoreProducts);
+        localStorage.setItem('echove_products', JSON.stringify(firestoreProducts));
+        if (onProductUpdate) {
+          onProductUpdate(firestoreProducts);
+        }
 
         // 3. Fetch Donations
         const firestoreDonations = await getAllDonations();
@@ -382,14 +388,19 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
     alert(`Đã cộng thành công ${pointsToAdd} PTS cho thành viên ${memberEmail}!`);
   };
 
-  const handleDeleteProduct = (productId: string) => {
+  const handleDeleteProduct = async (productId: string) => {
     if (window.confirm('Bạn có chắc chắn muốn xóa sản phẩm upcycle này không?')) {
       const updated = products.filter(p => p.id !== productId);
       saveProducts(updated);
+      try {
+        await deleteProduct(productId);
+      } catch (err) {
+        console.error("Error deleting product from Firestore:", err);
+      }
     }
   };
 
-  const handleAddProductSubmit = (e: React.FormEvent) => {
+  const handleAddProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProdName || !newProdDesc) {
       alert('Vui lòng điền đủ tên và mô tả sản phẩm.');
@@ -414,6 +425,12 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
 
     const updated = [newProd, ...products];
     saveProducts(updated);
+    
+    try {
+      await createProduct(newProd);
+    } catch (err) {
+      console.error("Error creating product in Firestore:", err);
+    }
     
     // Clear Form & Close
     setNewProdName('');

@@ -23,7 +23,8 @@ import {
   getDocs,
   deleteDoc
 } from 'firebase/firestore';
-import { User as AppUser, Order, DonationSubmission, Voucher, EmailConfig, EmailLog } from './types';
+import { User as AppUser, Order, DonationSubmission, Voucher, EmailConfig, EmailLog, Product } from './types';
+import { PRODUCTS } from './data';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || ["AIza", "SyCM", "wkG_", "o-qI", "NoqI", "kfFo", "34cZ", "f6SG", "vpT6", "9E4"].join(""),
@@ -427,5 +428,59 @@ export async function getAllEmailLogs(): Promise<EmailLog[]> {
   } catch (error) {
     console.error('Error fetching email logs:', error);
     return [];
+  }
+}
+
+// --- Product Firestore Sync Helpers ---
+
+// 1. Create or Update Product in Firestore
+export async function createProduct(product: Product): Promise<void> {
+  try {
+    const productRef = doc(db, 'products', product.id);
+    await setDoc(productRef, product);
+  } catch (error) {
+    console.error(`Error saving product ${product.id} to Firestore:`, error);
+    throw error;
+  }
+}
+
+// 2. Fetch All Products from Firestore (with automatic seeding from PRODUCTS if empty)
+export async function getAllProducts(): Promise<Product[]> {
+  try {
+    const querySnapshot = await getDocs(collection(db, 'products'));
+    const productsList: Product[] = [];
+    querySnapshot.forEach((doc) => {
+      productsList.push(doc.data() as Product);
+    });
+
+    if (productsList.length === 0) {
+      console.log('Firestore products collection is empty. Seeding with default products...');
+      // Seed default products in background so that they are persistent in Firestore
+      for (const prod of PRODUCTS) {
+        try {
+          await createProduct(prod);
+          productsList.push(prod);
+        } catch (err) {
+          console.error(`Error seeding default product ${prod.id}:`, err);
+        }
+      }
+    }
+
+    // Sort products by id ascending so the default and custom items remain in a beautiful structured order
+    return productsList.sort((a, b) => a.id.localeCompare(b.id));
+  } catch (error) {
+    console.error('Error fetching all products from Firestore:', error);
+    return PRODUCTS; // Fallback to local default PRODUCTS if offline or error
+  }
+}
+
+// 3. Delete Product from Firestore
+export async function deleteProduct(productId: string): Promise<void> {
+  try {
+    const productRef = doc(db, 'products', productId);
+    await deleteDoc(productRef);
+  } catch (error) {
+    console.error(`Error deleting product ${productId} from Firestore:`, error);
+    throw error;
   }
 }

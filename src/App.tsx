@@ -14,6 +14,7 @@ import TrackingModal from './components/TrackingModal';
 import { PRODUCTS } from './data';
 import { Product, CartItem, User } from './types';
 import AuthModal from './components/AuthModal';
+import { getAllProducts } from './firebase';
 import { Sparkles, MapPin, Instagram, Mail, Phone, ChevronRight, Facebook } from 'lucide-react';
 import logo from './assets/logo.svg';
 
@@ -54,7 +55,7 @@ export default function App() {
   const [isAuthOpen, setIsAuthOpen] = useState<boolean>(false);
   const [isTrackingOpen, setIsTrackingOpen] = useState<boolean>(false);
 
-  // Load cart, user, and products from localStorage on mount
+  // Load cart, user, and products from localStorage/Firestore on mount
   useEffect(() => {
     const savedCart = localStorage.getItem('echove_cart');
     if (savedCart) {
@@ -70,6 +71,16 @@ export default function App() {
     if (savedProducts) {
       setProducts(JSON.parse(savedProducts));
     }
+
+    // Always fetch latest products from Firestore to keep data up to date
+    getAllProducts().then((firestoreProducts) => {
+      if (firestoreProducts && firestoreProducts.length > 0) {
+        setProducts(firestoreProducts);
+        localStorage.setItem('echove_products', JSON.stringify(firestoreProducts));
+      }
+    }).catch((err) => {
+      console.error('Error loading products from Firestore:', err);
+    });
   }, []);
 
   // Save cart to localStorage on changes
