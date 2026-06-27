@@ -71,10 +71,11 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
   const [newProdName, setNewProdName] = useState('');
   const [newProdPrice, setNewProdPrice] = useState<number>(450000);
-  const [newProdCategory, setNewProdCategory] = useState<'outerwear' | 'bottoms' | 'accessories'>('outerwear');
+  const [newProdCategory, setNewProdCategory] = useState<'outerwear' | 'bottoms' | 'accessories' | 'handbags'>('outerwear');
   const [newProdDesc, setNewProdDesc] = useState('');
   const [newProdStory, setNewProdStory] = useState('');
-  const [newProdImage, setNewProdImage] = useState('https://images.unsplash.com/photo-1542272604-787c3835535d?w=600&auto=format&fit=crop&q=60');
+  const [newProdImages, setNewProdImages] = useState<string[]>(['https://images.unsplash.com/photo-1542272604-787c3835535d?w=600&auto=format&fit=crop&q=60']);
+  const [newImageUrlInput, setNewImageUrlInput] = useState('');
   const [newProdJeansCount, setNewProdJeansCount] = useState<number>(2);
   const [newProdDifficulty, setNewProdDifficulty] = useState<string>('Trung bình');
   const [newProdMeasurements, setNewProdMeasurements] = useState({ chest: '115 cm', length: '65 cm', waist: 'N/A' });
@@ -412,7 +413,7 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
       name: newProdName,
       price: newProdPrice,
       description: newProdDesc,
-      images: [newProdImage],
+      images: newProdImages.length > 0 ? newProdImages : ['https://images.unsplash.com/photo-1542272604-787c3835535d?w=600&auto=format&fit=crop&q=60'],
       category: newProdCategory,
       story: newProdStory || 'Sản phẩm tái sinh sáng tạo thiết kế độc quyền bởi các nghệ nhân ECHOVE Studio dạo phố.',
       originalJeansCount: newProdJeansCount,
@@ -437,6 +438,8 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
     setNewProdPrice(450000);
     setNewProdDesc('');
     setNewProdStory('');
+    setNewProdImages(['https://images.unsplash.com/photo-1542272604-787c3835535d?w=600&auto=format&fit=crop&q=60']);
+    setNewImageUrlInput('');
     setIsAddProductOpen(false);
     alert('Thêm sản phẩm độc bản mới thành công!');
   };
@@ -1358,6 +1361,7 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
                     <option value="outerwear">Áo Khoác (Outerwear)</option>
                     <option value="bottoms">Quần Bò (Bottoms)</option>
                     <option value="accessories">Phụ kiện (Accessories)</option>
+                    <option value="handbags">Túi xách (Handbags)</option>
                   </select>
                 </div>
 
@@ -1390,16 +1394,82 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
                 </div>
               </div>
 
-              {/* Image URL */}
-              <div className="space-y-1.5">
-                <label className="block text-[10px] font-mono uppercase text-white/50 tracking-wider">Đường dẫn hình ảnh minh họa (URL) *</label>
-                <input
-                  type="text"
-                  required
-                  value={newProdImage}
-                  onChange={(e) => setNewProdImage(e.target.value)}
-                  className="w-full bg-[#0F1012] border border-white/10 text-white px-3 py-2 text-sm focus:outline-none focus:border-mustard rounded-xs font-mono"
-                />
+              {/* Multi-Image Manager with File Upload and URL Inputs */}
+              <div className="space-y-3 bg-[#0F1012]/40 p-3 border border-white/5 rounded-xs">
+                <div className="flex justify-between items-center">
+                  <label className="block text-[10px] font-mono uppercase text-white/50 tracking-wider font-bold">Hình ảnh sản phẩm *</label>
+                  <span className="text-[9px] font-mono text-white/40 uppercase">Đã thêm {newProdImages.length} ảnh</span>
+                </div>
+
+                {/* Thumbnails list */}
+                {newProdImages.length > 0 && (
+                  <div className="grid grid-cols-4 gap-2">
+                    {newProdImages.map((img, index) => (
+                      <div key={index} className="relative aspect-square bg-[#0F1012] border border-white/10 rounded-xs group overflow-hidden">
+                        <img src={img} alt="Product preview" className="w-full h-full object-cover animate-in fade-in" />
+                        <button
+                          type="button"
+                          onClick={() => setNewProdImages(prev => prev.filter((_, i) => i !== index))}
+                          className="absolute inset-0 bg-red-600/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-white font-mono text-[9px] font-black uppercase tracking-wider cursor-pointer"
+                        >
+                          Xóa
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* URL Input */}
+                <div className="flex space-x-2">
+                  <input
+                    type="text"
+                    placeholder="Dán URL hình ảnh..."
+                    value={newImageUrlInput}
+                    onChange={(e) => setNewImageUrlInput(e.target.value)}
+                    className="flex-1 bg-[#0F1012] border border-white/10 text-white px-2.5 py-1.5 text-xs focus:outline-none focus:border-mustard rounded-xs font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (newImageUrlInput.trim()) {
+                        setNewProdImages(prev => [...prev, newImageUrlInput.trim()]);
+                        setNewImageUrlInput('');
+                      }
+                    }}
+                    className="bg-white/10 hover:bg-mustard hover:text-denim-dark px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider rounded-xs text-white transition-all cursor-pointer"
+                  >
+                    Thêm URL
+                  </button>
+                </div>
+
+                {/* File Upload with Drag & Drop */}
+                <div className="relative border border-dashed border-white/20 hover:border-mustard/50 rounded-xs p-3 transition-colors text-center bg-[#0F1012]/50">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(e) => {
+                      const files = e.target.files;
+                      if (!files) return;
+                      Array.from(files).forEach((file: any) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          if (typeof reader.result === 'string') {
+                            setNewProdImages(prev => [...prev, reader.result as string]);
+                          }
+                        };
+                        reader.readAsDataURL(file);
+                      });
+                    }}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <p className="text-[10px] font-mono text-white/60 uppercase">
+                    Tải ảnh lên trực tiếp từ thiết bị (File)
+                  </p>
+                  <p className="text-[9px] font-mono text-white/30 uppercase mt-0.5">
+                    Click hoặc Kéo thả nhiều file ảnh vào đây
+                  </p>
+                </div>
               </div>
 
               {/* Description */}

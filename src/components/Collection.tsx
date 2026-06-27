@@ -18,6 +18,7 @@ export default function Collection({ onSelectProduct, onAddToCart, products = PR
     { id: 'outerwear', label: 'ÁO KHOÁC / GILLET' },
     { id: 'bottoms', label: 'QUẦN TRANG PHỤC' },
     { id: 'accessories', label: 'PHỤ KIỆN / NÓN' },
+    { id: 'handbags', label: 'TÚI XÁCH' },
   ];
 
   const filteredProducts = activeCategory === 'all'

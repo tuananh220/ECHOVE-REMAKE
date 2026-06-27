@@ -4,7 +4,7 @@ export interface Product {
   price: number;
   description: string;
   images: string[];
-  category: 'outerwear' | 'bottoms' | 'accessories';
+  category: 'outerwear' | 'bottoms' | 'accessories' | 'handbags';
   story: string;
   originalJeansCount: number; // Number of old jeans used to create this product
   artisanDifficulty: 'Trung bình' | 'Khó' | 'Cực khó'; // Difficulty level of making it
