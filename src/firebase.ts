@@ -464,6 +464,9 @@ export async function getAllProducts(): Promise<Product[]> {
           console.error(`Error seeding default product ${prod.id}:`, err);
         }
       }
+      if (productsList.length === 0) {
+        return PRODUCTS;
+      }
     }
 
     // Sort products by id ascending so the default and custom items remain in a beautiful structured order
