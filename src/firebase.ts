@@ -444,7 +444,7 @@ export async function createProduct(product: Product): Promise<void> {
   }
 }
 
-// 2. Fetch All Products from Firestore (with automatic seeding from PRODUCTS if empty)
+// 2. Fetch All Products from Firestore (with automatic seeding from PRODUCTS if empty, but only once)
 export async function getAllProducts(): Promise<Product[]> {
   try {
     const querySnapshot = await getDocs(collection(db, 'products'));
@@ -453,19 +453,28 @@ export async function getAllProducts(): Promise<Product[]> {
       productsList.push(doc.data() as Product);
     });
 
-    if (productsList.length === 0) {
-      console.log('Firestore products collection is empty. Seeding with default products...');
-      // Seed default products in background so that they are persistent in Firestore
-      for (const prod of PRODUCTS) {
-        try {
-          await createProduct(prod);
-          productsList.push(prod);
-        } catch (err) {
-          console.error(`Error seeding default product ${prod.id}:`, err);
+    // Check if we have already performed the initial seed
+    const seedRef = doc(db, 'system', 'seeding_v1');
+    const seedSnap = await getDoc(seedRef);
+
+    if (!seedSnap.exists()) {
+      if (productsList.length === 0) {
+        console.log('Firestore products collection is empty. Seeding with default products...');
+        // Seed default products in background so that they are persistent in Firestore
+        for (const prod of PRODUCTS) {
+          try {
+            await createProduct(prod);
+            productsList.push(prod);
+          } catch (err) {
+            console.error(`Error seeding default product ${prod.id}:`, err);
+          }
         }
       }
-      if (productsList.length === 0) {
-        return PRODUCTS;
+      // Save seeding completion status to prevent any future re-seeding
+      try {
+        await setDoc(seedRef, { seeded: true, timestamp: Date.now() });
+      } catch (err) {
+        console.error('Error saving seeding flag to Firestore:', err);
       }
     }
 
