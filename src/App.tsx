@@ -82,6 +82,13 @@ export default function App() {
     });
   }, []);
 
+  // Track page/tab visits
+  useEffect(() => {
+    import('./firebase').then((m) => {
+      m.logTrafficVisit(currentTab);
+    });
+  }, [currentTab]);
+
   // Save cart to localStorage on changes
   const saveCart = (items: CartItem[]) => {
     setCartItems(items);

@@ -495,3 +495,41 @@ export async function deleteProduct(productId: string): Promise<void> {
     throw error;
   }
 }
+
+// --- Traffic Logging Helpers ---
+export interface TrafficLog {
+  id: string;
+  page: string;
+  timestamp: string;
+  userAgent?: string;
+}
+
+export async function logTrafficVisit(page: string): Promise<void> {
+  try {
+    const logId = `LOG-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const logRef = doc(db, 'traffic_logs', logId);
+    await setDoc(logRef, {
+      id: logId,
+      page,
+      timestamp: new Date().toISOString(),
+      userAgent: navigator.userAgent
+    });
+  } catch (error) {
+    console.error('Error logging traffic visit:', error);
+  }
+}
+
+export async function getTrafficLogs(): Promise<TrafficLog[]> {
+  try {
+    const querySnapshot = await getDocs(collection(db, 'traffic_logs'));
+    const logs: TrafficLog[] = [];
+    querySnapshot.forEach((doc) => {
+      logs.push(doc.data() as TrafficLog);
+    });
+    return logs;
+  } catch (error) {
+    console.error('Error fetching traffic logs:', error);
+    return [];
+  }
+}
+
