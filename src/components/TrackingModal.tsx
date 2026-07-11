@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, ShoppingBag, Gift, Truck, CheckCircle, PackageCheck, RefreshCw, AlertCircle, Clock, Sparkles } from 'lucide-react';
 import { Order, DonationSubmission, User } from '../types';
-import { getUserOrders, getUserDonations } from '../firebase';
+import { getUserOrders, getUserDonations, updateOrderStatus } from '../firebase';
 
 interface TrackingModalProps {
   isOpen: boolean;
@@ -14,6 +14,50 @@ export default function TrackingModal({ isOpen, onClose, user }: TrackingModalPr
   const [orders, setOrders] = useState<Order[]>([]);
   const [donations, setDonations] = useState<DonationSubmission[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Cancellation States
+  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
+  const [cancelReasonOption, setCancelReasonOption] = useState<string>('Thay đổi ý định / Muốn mua sản phẩm khác');
+  const [customCancelReason, setCustomCancelReason] = useState<string>('');
+  const [isSubmittingCancel, setIsSubmittingCancel] = useState(false);
+
+  const handleCancelOrder = async (orderId: string) => {
+    const finalReason = cancelReasonOption === 'Lý do khác...' 
+      ? (customCancelReason.trim() || 'Lý do khác') 
+      : cancelReasonOption;
+      
+    setIsSubmittingCancel(true);
+    try {
+      await updateOrderStatus(orderId, 'cancelled', {
+        reason: finalReason,
+        cancelledBy: 'user',
+        cancelledAt: new Date().toISOString()
+      });
+      
+      // Update local state
+      setOrders(prev => prev.map(o => {
+        if (o.id === orderId) {
+          return {
+            ...o,
+            status: 'cancelled',
+            cancelReason: finalReason,
+            cancelledBy: 'user',
+            cancelledAt: new Date().toISOString()
+          };
+        }
+        return o;
+      }));
+      
+      setCancellingOrderId(null);
+      setCustomCancelReason('');
+      alert('Đã hủy đơn hàng thành công! 😔');
+    } catch (err: any) {
+      console.error('Lỗi khi hủy đơn hàng:', err);
+      alert('Không thể hủy đơn hàng lúc này: ' + (err?.message || 'Lỗi mạng'));
+    } finally {
+      setIsSubmittingCancel(false);
+    }
+  };
 
   useEffect(() => {
     async function loadTrackingData() {
@@ -47,6 +91,7 @@ export default function TrackingModal({ isOpen, onClose, user }: TrackingModalPr
       case 'confirmed': return 'Đã xác nhận đơn';
       case 'shipping': return 'Đang giao hàng';
       case 'completed': return 'Giao hàng thành công';
+      case 'cancelled': return 'Đã hủy đơn';
       default: return status;
     }
   };
@@ -167,38 +212,128 @@ export default function TrackingModal({ isOpen, onClose, user }: TrackingModalPr
                         ))}
                       </div>
 
-                      {/* Timeline Visualizer */}
-                      <div className="pt-3 border-t border-white/5 space-y-3">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest">TRẠNG THÁI GIAO HÀNG</span>
-                          <span className="bg-mustard/15 text-mustard border border-mustard/20 px-2 py-0.5 font-mono text-[10px] font-bold rounded-xs uppercase">
-                            {getOrderStatusLabel(order.status)}
-                          </span>
+                      {/* Timeline Visualizer or Cancellation info */}
+                      {order.status === 'cancelled' ? (
+                        <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-xs text-xs space-y-1.5 mt-3">
+                          <div className="flex items-center space-x-1.5 text-red-400 font-bold uppercase tracking-wider text-[10px]">
+                            <AlertCircle className="w-4 h-4 shrink-0 animate-pulse" />
+                            <span>Đơn hàng đã bị hủy</span>
+                          </div>
+                          <p className="text-white/80 text-[11px]">
+                            <span className="text-white/40">Người hủy:</span>{' '}
+                            {order.cancelledBy === 'admin' ? 'Ban Điều Hành (Admin)' : 'Bạn (Khách hàng)'}
+                          </p>
+                          {order.cancelReason && (
+                            <p className="text-white/80 text-[11px] leading-relaxed">
+                              <span className="text-white/40">Lý do hủy:</span> {order.cancelReason}
+                            </p>
+                          )}
+                          {order.cancelledAt && (
+                            <p className="text-white/30 text-[9px] font-mono">
+                              Thời gian hủy: {new Date(order.cancelledAt).toLocaleString('vi-VN')}
+                            </p>
+                          )}
                         </div>
+                      ) : (
+                        <div className="pt-3 border-t border-white/5 space-y-3">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-mono text-white/40 uppercase tracking-widest">TRẠNG THÁI GIAO HÀNG</span>
+                            <span className="bg-mustard/15 text-mustard border border-mustard/20 px-2 py-0.5 font-mono text-[10px] font-bold rounded-xs uppercase">
+                              {getOrderStatusLabel(order.status)}
+                            </span>
+                          </div>
 
-                        {/* Interactive Steps progress bar */}
-                        <div className="grid grid-cols-4 gap-1 text-[10px] text-center pt-1 font-mono">
-                          <div className="flex flex-col items-center">
-                            <CheckCircle className="w-4 h-4 text-emerald-400 mb-1 shrink-0" />
-                            <span className="text-emerald-400 font-bold">Đặt mua</span>
-                          </div>
-                          
-                          <div className="flex flex-col items-center">
-                            <CheckCircle className={`w-4 h-4 mb-1 shrink-0 ${isConfirmed || isShipping || isCompleted ? 'text-emerald-400' : 'text-white/20'}`} />
-                            <span className={isConfirmed || isShipping || isCompleted ? 'text-emerald-400 font-bold' : 'text-white/20'}>Xác nhận</span>
-                          </div>
-                          
-                          <div className="flex flex-col items-center">
-                            <Truck className={`w-4 h-4 mb-1 shrink-0 ${isShipping || isCompleted ? 'text-emerald-400' : 'text-white/20'}`} />
-                            <span className={isShipping || isCompleted ? 'text-emerald-400 font-bold' : 'text-white/20'}>Đang giao</span>
-                          </div>
-                          
-                          <div className="flex flex-col items-center">
-                            <PackageCheck className={`w-4 h-4 mb-1 shrink-0 ${isCompleted ? 'text-emerald-400' : 'text-white/20'}`} />
-                            <span className={isCompleted ? 'text-emerald-400 font-bold' : 'text-white/20'}>Đã nhận</span>
+                          {/* Interactive Steps progress bar */}
+                          <div className="grid grid-cols-4 gap-1 text-[10px] text-center pt-1 font-mono">
+                            <div className="flex flex-col items-center">
+                              <CheckCircle className="w-4 h-4 text-emerald-400 mb-1 shrink-0" />
+                              <span className="text-emerald-400 font-bold">Đặt mua</span>
+                            </div>
+                            
+                            <div className="flex flex-col items-center">
+                              <CheckCircle className={`w-4 h-4 mb-1 shrink-0 ${isConfirmed || isShipping || isCompleted ? 'text-emerald-400' : 'text-white/20'}`} />
+                              <span className={isConfirmed || isShipping || isCompleted ? 'text-emerald-400 font-bold' : 'text-white/20'}>Xác nhận</span>
+                            </div>
+                            
+                            <div className="flex flex-col items-center">
+                              <Truck className={`w-4 h-4 mb-1 shrink-0 ${isShipping || isCompleted ? 'text-emerald-400' : 'text-white/20'}`} />
+                              <span className={isShipping || isCompleted ? 'text-emerald-400 font-bold' : 'text-white/20'}>Đang giao</span>
+                            </div>
+                            
+                            <div className="flex flex-col items-center">
+                              <PackageCheck className={`w-4 h-4 mb-1 shrink-0 ${isCompleted ? 'text-emerald-400' : 'text-white/20'}`} />
+                              <span className={isCompleted ? 'text-emerald-400 font-bold' : 'text-white/20'}>Đã nhận</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      )}
+
+                      {/* Cancel order interactive form */}
+                      {order.status === 'pending' && cancellingOrderId !== order.id && (
+                        <div className="flex justify-end pt-2 border-t border-white/5">
+                          <button
+                            onClick={() => {
+                              setCancellingOrderId(order.id);
+                              setCancelReasonOption('Thay đổi ý định / Muốn mua sản phẩm khác');
+                              setCustomCancelReason('');
+                            }}
+                            className="text-[10px] uppercase font-mono tracking-wider bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/15 px-3 py-1.5 rounded-xs transition-all cursor-pointer"
+                          >
+                            Hủy đơn hàng
+                          </button>
+                        </div>
+                      )}
+
+                      {cancellingOrderId === order.id && (
+                        <div className="bg-black/35 border border-white/10 p-3.5 rounded-xs space-y-3 text-xs mt-3">
+                          <p className="font-mono text-mustard font-black text-[10px] uppercase tracking-wider">
+                            Yêu cầu hủy đơn hàng
+                          </p>
+                          <div className="space-y-1.5">
+                            <label className="text-white/50 text-[10px] uppercase tracking-wider">Chọn lý do hủy:</label>
+                            <select
+                              value={cancelReasonOption}
+                              onChange={(e) => setCancelReasonOption(e.target.value)}
+                              className="w-full bg-denim-dark border border-white/10 text-white rounded-xs p-1.5 text-xs focus:outline-none focus:border-mustard"
+                            >
+                              <option value="Thay đổi ý định / Muốn mua sản phẩm khác">Thay đổi ý định / Muốn mua sản phẩm khác</option>
+                              <option value="Nhập sai thông tin giao hàng / Số điện thoại">Nhập sai thông tin giao hàng / Số điện thoại</option>
+                              <option value="Thời gian giao hàng dự kiến quá lâu">Thời gian giao hàng dự kiến quá lâu</option>
+                              <option value="Lý do khác...">Lý do khác...</option>
+                            </select>
+                          </div>
+
+                          {cancelReasonOption === 'Lý do khác...' && (
+                            <div className="space-y-1.5">
+                              <label className="text-white/50 text-[10px] uppercase tracking-wider">Chi tiết lý do khác:</label>
+                              <textarea
+                                value={customCancelReason}
+                                onChange={(e) => setCustomCancelReason(e.target.value)}
+                                placeholder="Nhập lý do cụ thể của bạn..."
+                                rows={2}
+                                className="w-full bg-denim-dark border border-white/10 text-white rounded-xs p-2 text-xs focus:outline-none focus:border-mustard"
+                              />
+                            </div>
+                          )}
+
+                          <div className="flex justify-end space-x-2 pt-1">
+                            <button
+                              onClick={() => setCancellingOrderId(null)}
+                              className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white border border-white/10 text-[10px] uppercase font-mono tracking-wider rounded-xs cursor-pointer"
+                              disabled={isSubmittingCancel}
+                            >
+                              Quay lại
+                            </button>
+                            <button
+                              onClick={() => handleCancelOrder(order.id)}
+                              className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-[10px] uppercase font-mono tracking-wider rounded-xs cursor-pointer font-bold"
+                              disabled={isSubmittingCancel || (cancelReasonOption === 'Lý do khác...' && !customCancelReason.trim())}
+                            >
+                              {isSubmittingCancel ? 'Đang hủy...' : 'Hủy đơn hàng'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })

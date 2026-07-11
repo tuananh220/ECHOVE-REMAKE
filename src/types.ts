@@ -53,7 +53,10 @@ export interface Order {
   discountApplied?: number; // Discount amount in VND
   appliedVoucherCode?: string; // Voucher code used
   paymentMethod: 'COD';
-  status: 'pending' | 'confirmed' | 'shipping' | 'completed';
+  status: 'pending' | 'confirmed' | 'shipping' | 'completed' | 'cancelled';
+  cancelReason?: string;
+  cancelledBy?: 'user' | 'admin';
+  cancelledAt?: string;
   createdAt: string;
 }
 

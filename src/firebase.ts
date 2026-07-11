@@ -424,12 +424,23 @@ export async function getAllUsers(): Promise<AppUser[]> {
 }
 
 // 8. Update Order Status
-export async function updateOrderStatus(orderId: string, status: Order['status']): Promise<void> {
+export async function updateOrderStatus(
+  orderId: string, 
+  status: Order['status'], 
+  cancelDetails?: { reason: string; cancelledBy: 'user' | 'admin'; cancelledAt: string }
+): Promise<void> {
   try {
     const orderRef = doc(db, 'orders', orderId);
-    await updateDoc(orderRef, { status });
+    const updateData: any = { status };
+    if (cancelDetails) {
+      updateData.cancelReason = cancelDetails.reason;
+      updateData.cancelledBy = cancelDetails.cancelledBy;
+      updateData.cancelledAt = cancelDetails.cancelledAt;
+    }
+    await updateDoc(orderRef, updateData);
   } catch (error) {
     console.error('Error updating order status in Firestore:', error);
+    throw error;
   }
 }
 

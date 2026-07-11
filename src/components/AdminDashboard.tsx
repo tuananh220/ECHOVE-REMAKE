@@ -70,6 +70,10 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
   const [isSavingEmailConfig, setIsSavingEmailConfig] = useState(false);
   const [viewingEmailBody, setViewingEmailBody] = useState<string | null>(null);
 
+  // Admin Cancellation States
+  const [adminCancellingOrderId, setAdminCancellingOrderId] = useState<string | null>(null);
+  const [adminCancelReason, setAdminCancelReason] = useState<string>('');
+
   // Search & Filter States
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -437,6 +441,44 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
       await updateOrderStatus(orderId, newStatus);
     } catch (err) {
       console.error("Error updating order status in Firestore:", err);
+    }
+  };
+
+  const handleAdminCancelOrder = async (orderId: string) => {
+    if (!adminCancelReason.trim()) {
+      alert('Vui lòng nhập lý do hủy đơn hàng.');
+      return;
+    }
+
+    const reason = adminCancelReason.trim();
+    const cancelledAt = new Date().toISOString();
+
+    const updated = orders.map(o => {
+      if (o.id === orderId) {
+        return { 
+          ...o, 
+          status: 'cancelled' as const,
+          cancelReason: reason,
+          cancelledBy: 'admin' as const,
+          cancelledAt: cancelledAt
+        };
+      }
+      return o;
+    });
+    saveOrders(updated);
+
+    try {
+      await updateOrderStatus(orderId, 'cancelled', {
+        reason: reason,
+        cancelledBy: 'admin',
+        cancelledAt: cancelledAt
+      });
+      alert('Đã hủy đơn hàng thành công! 😔');
+      setAdminCancellingOrderId(null);
+      setAdminCancelReason('');
+    } catch (err) {
+      console.error("Error cancelling order by admin in Firestore:", err);
+      alert('Hủy đơn hàng thất bại.');
     }
   };
 
@@ -930,6 +972,7 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
                 <option value="confirmed">ĐÃ XÁC NHẬN (CONFIRMED)</option>
                 <option value="shipping">ĐANG GIAO HÀNG (SHIPPING)</option>
                 <option value="completed">HOÀN TẤT (COMPLETED)</option>
+                <option value="cancelled">ĐÃ HỦY (CANCELLED)</option>
               </select>
             </div>
           )}
@@ -1352,6 +1395,9 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
                       {order.status === 'completed' && (
                         <span className="bg-emerald-500/10 border border-emerald-500/35 text-emerald-400 font-mono text-[9px] sm:text-xs uppercase px-2 py-0.5 rounded-sm font-bold">Hoàn tất</span>
                       )}
+                      {order.status === 'cancelled' && (
+                        <span className="bg-red-500/10 border border-red-500/35 text-red-400 font-mono text-[9px] sm:text-xs uppercase px-2 py-0.5 rounded-sm font-bold">Đã hủy</span>
+                      )}
 
                       {/* Individual Order Delete Button */}
                       <button
@@ -1440,6 +1486,68 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
                             <Check className="w-3.5 h-3.5" />
                             <span>ĐÃ HOÀN TẤT ĐỒNG BỘ</span>
                           </div>
+                        )}
+                        {order.status === 'cancelled' && (
+                          <div className="bg-red-500/10 border border-red-500/20 p-2.5 rounded-xs text-xs space-y-1 text-red-400 font-mono">
+                            <p className="font-bold text-[10px] uppercase">ĐƠN ĐÃ HỦY</p>
+                            <p className="text-white/70 text-[11px] normal-case">
+                              <span className="text-white/40 font-mono text-[10px] uppercase">Bởi:</span>{' '}
+                              {order.cancelledBy === 'admin' ? 'Ban Điều Hành' : 'Khách hàng'}
+                            </p>
+                            {order.cancelReason && (
+                              <p className="text-white/80 text-[11px] leading-relaxed normal-case">
+                                <span className="text-white/40 font-mono text-[10px] uppercase">Lý do:</span> {order.cancelReason}
+                              </p>
+                            )}
+                            {order.cancelledAt && (
+                              <p className="text-white/30 text-[9px]">
+                                Lúc: {new Date(order.cancelledAt).toLocaleString('vi-VN')}
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Admin Cancel Interactive Section */}
+                        {adminCancellingOrderId === order.id ? (
+                          <div className="space-y-2 mt-2 bg-black/40 p-2.5 rounded-xs border border-white/5">
+                            <p className="text-[9px] font-mono text-mustard uppercase">Nhập lý do hủy đơn:</p>
+                            <textarea
+                              value={adminCancelReason}
+                              onChange={(e) => setAdminCancelReason(e.target.value)}
+                              placeholder="Nhập lý do cụ thể..."
+                              rows={2}
+                              className="w-full bg-[#1C1E22] border border-white/10 text-white rounded-xs p-1.5 text-xs focus:outline-none focus:border-mustard"
+                            />
+                            <div className="flex gap-1.5 justify-end">
+                              <button
+                                onClick={() => {
+                                  setAdminCancellingOrderId(null);
+                                  setAdminCancelReason('');
+                                }}
+                                className="px-2.5 py-1 bg-white/5 hover:bg-white/10 text-white font-mono text-[9px] uppercase rounded-xs cursor-pointer"
+                              >
+                                Hủy bỏ
+                              </button>
+                              <button
+                                onClick={() => handleAdminCancelOrder(order.id)}
+                                className="px-2.5 py-1 bg-red-600 hover:bg-red-500 text-white font-mono text-[9px] uppercase font-bold rounded-xs cursor-pointer"
+                              >
+                                Xác nhận
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          order.status !== 'cancelled' && order.status !== 'completed' && (
+                            <button
+                              onClick={() => {
+                                setAdminCancellingOrderId(order.id);
+                                setAdminCancelReason('');
+                              }}
+                              className="w-full mt-1.5 bg-red-950/40 hover:bg-red-950/60 border border-red-500/20 text-red-400 font-display text-[10px] font-bold tracking-widest py-1.5 rounded-xs transition-colors cursor-pointer text-center uppercase"
+                            >
+                              Hủy đơn hàng
+                            </button>
+                          )
                         )}
                       </div>
                     </div>
