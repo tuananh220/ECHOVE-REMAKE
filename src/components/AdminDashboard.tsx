@@ -108,21 +108,7 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
           firestoreOrders.push(doc.data() as Order);
         });
         
-        const savedOrders = localStorage.getItem('echove_orders');
-        const localOrders: Order[] = savedOrders ? JSON.parse(savedOrders) : [];
-        
-        // Merge and uniquely identify by ID
-        const unifiedOrders = new Map<string, Order>();
-        firestoreOrders.forEach(o => unifiedOrders.set(o.id, o));
-        localOrders.forEach(o => {
-          if (!unifiedOrders.has(o.id)) {
-            unifiedOrders.set(o.id, o);
-            // Save local-only ones to firestore
-            import('../firebase').then(m => m.createOrder(o));
-          }
-        });
-        
-        const orderList = Array.from(unifiedOrders.values()).sort(
+        const orderList = firestoreOrders.sort(
           (a, b) => b.id.localeCompare(a.id)
         );
         setOrders(orderList);
@@ -176,19 +162,7 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
           firestoreDonations.push(doc.data() as DonationSubmission);
         });
         
-        const savedDonations = localStorage.getItem('echove_donations');
-        const localDonations: DonationSubmission[] = savedDonations ? JSON.parse(savedDonations) : [];
-        
-        const unifiedDonations = new Map<string, DonationSubmission>();
-        firestoreDonations.forEach(d => unifiedDonations.set(d.id, d));
-        localDonations.forEach(d => {
-          if (!unifiedDonations.has(d.id)) {
-            unifiedDonations.set(d.id, d);
-            import('../firebase').then(m => m.createDonation(d));
-          }
-        });
-        
-        const donationList = Array.from(unifiedDonations.values()).sort(
+        const donationList = firestoreDonations.sort(
           (a, b) => b.id.localeCompare(a.id)
         );
         setDonations(donationList);
@@ -493,7 +467,44 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
       console.error("Lỗi khi xóa đơn hàng:", err);
       alert("Đã xảy ra lỗi khi xóa đơn hàng từ Firestore. Vui lòng thử lại.");
     } finally {
+      setIsLoadingData(false);
       setIsCleaningOrders(false);
+    }
+  };
+
+  const handleDeleteOrder = async (orderId: string) => {
+    if (orderId === 'ECH-ORD-964676') {
+      alert("Đơn hàng ECH-ORD-964676 được bảo vệ làm mẫu, không thể xóa!");
+      return;
+    }
+    if (window.confirm(`Bạn có chắc chắn muốn xóa đơn hàng ${orderId} khỏi cơ sở dữ liệu?`)) {
+      try {
+        await deleteDoc(doc(db, 'orders', orderId));
+        alert(`Đã xóa đơn hàng ${orderId} thành công!`);
+      } catch (err) {
+        console.error("Lỗi khi xóa đơn hàng:", err);
+        alert("Đã xảy ra lỗi khi xóa đơn hàng từ Firestore.");
+      }
+    }
+  };
+
+  const handleDeleteUser = async (member: User) => {
+    if (member.role === 'admin') {
+      alert("Không thể xóa tài khoản của Admin!");
+      return;
+    }
+    if (member.uid.startsWith('social-')) {
+      alert("Đây là tài khoản mẫu (mock), không thể xóa khỏi database!");
+      return;
+    }
+    if (window.confirm(`Bạn có chắc chắn muốn xóa thành viên ${member.displayName || member.email} khỏi cơ sở dữ liệu?`)) {
+      try {
+        await deleteDoc(doc(db, 'users', member.uid));
+        alert(`Đã xóa thành viên ${member.displayName || member.email} thành công!`);
+      } catch (err) {
+        console.error("Lỗi khi xóa thành viên:", err);
+        alert("Đã xảy ra lỗi khi xóa thành viên từ Firestore.");
+      }
     }
   };
 
@@ -842,6 +853,17 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
                       {order.status === 'completed' && (
                         <span className="bg-emerald-500/10 border border-emerald-500/35 text-emerald-400 font-mono text-[9px] sm:text-xs uppercase px-2 py-0.5 rounded-sm font-bold">Hoàn tất</span>
                       )}
+
+                      {/* Individual Order Delete Button */}
+                      {order.id !== 'ECH-ORD-964676' && (
+                        <button
+                          onClick={() => handleDeleteOrder(order.id)}
+                          className="ml-2 p-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/25 text-red-400 hover:text-red-300 transition-colors rounded-xs cursor-pointer flex items-center justify-center"
+                          title="Xóa đơn hàng"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -1119,6 +1141,7 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
                     <th className="p-4">Phương thức liên kết</th>
                     <th className="p-4 text-center">Điểm thành viên</th>
                     <th className="p-4 text-right">Phần thưởng nhanh</th>
+                    <th className="p-4 text-center">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -1162,6 +1185,19 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
                               +100 PTS
                             </button>
                           </div>
+                        )}
+                      </td>
+                      <td className="p-4 text-center">
+                        {member.role !== 'admin' && !member.uid.startsWith('social-') ? (
+                          <button
+                            onClick={() => handleDeleteUser(member)}
+                            className="p-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/25 text-red-400 hover:text-red-300 transition-colors rounded-xs cursor-pointer inline-flex items-center justify-center"
+                            title="Xóa thành viên"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        ) : (
+                          <span className="text-white/20 font-mono text-[10px] uppercase">Mẫu / Admin</span>
                         )}
                       </td>
                     </tr>
