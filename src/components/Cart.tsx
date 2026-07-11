@@ -152,11 +152,13 @@ export default function Cart({ isOpen, onClose, cartItems, onUpdateQuantity, onR
        return;
     }
 
+    const cleanEmail = email.toLowerCase().trim();
+
     const newOrder: Order = {
       id: 'ECH-ORD-' + Math.floor(100000 + Math.random() * 900000),
       customerName,
       phone,
-      email,
+      email: cleanEmail,
       address,
       note: note || '',
       items: [...cartItems],
@@ -172,7 +174,7 @@ export default function Cart({ isOpen, onClose, cartItems, onUpdateQuantity, onR
     // Save details to localStorage for prefill fallback
     localStorage.setItem('echove_last_name', customerName);
     localStorage.setItem('echove_last_phone', phone);
-    localStorage.setItem('echove_last_email', email);
+    localStorage.setItem('echove_last_email', cleanEmail);
     localStorage.setItem('echove_last_address', address);
 
     // Save order in localStorage so they can see order confirmation history
@@ -189,8 +191,10 @@ export default function Cart({ isOpen, onClose, cartItems, onUpdateQuantity, onR
       if (user?.uid) {
         await updateUserProfileDetails(user.uid, phone, address);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error saving order to cloud:", err);
+      alert("Hệ thống gặp lỗi khi gửi đơn hàng lên đám mây: " + (err?.message || "Vui lòng kiểm tra kết nối mạng và thử lại nhé!"));
+      return; // Stop execution here so checkout doesn't fake a success!
     }
 
     // Trigger Automatic Email

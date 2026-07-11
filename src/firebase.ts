@@ -65,6 +65,69 @@ function cleanUndefined(obj: any): any {
   return obj;
 }
 
+// Helper to safely parse dates for sorting, supporting both ISO formats and Vietnamese DD/MM/YYYY
+export function parseVietnameseDate(dateStr: any): number {
+  try {
+    if (!dateStr || typeof dateStr !== 'string') return 0;
+    
+    // Check if it's in DD/MM/YYYY format or similar
+    if (dateStr.includes('/')) {
+      const parts = dateStr.trim().split(' ');
+      const datePart = parts[0];
+      const timePart = parts[1] || '';
+      
+      const dateSubparts = datePart.split('/');
+      if (dateSubparts.length === 3) {
+        const day = parseInt(dateSubparts[0], 10);
+        const month = parseInt(dateSubparts[1], 10);
+        const year = parseInt(dateSubparts[2], 10);
+        
+        let hours = 0;
+        let minutes = 0;
+        if (timePart && timePart.includes(':')) {
+          const timeSubparts = timePart.split(':');
+          hours = parseInt(timeSubparts[0], 10) || 0;
+          minutes = parseInt(timeSubparts[1], 10) || 0;
+        }
+        
+        const parsedDate = new Date(year, month - 1, day, hours, minutes);
+        return isNaN(parsedDate.getTime()) ? 0 : parsedDate.getTime();
+      }
+    }
+    
+    // Check if it has dashes DD-MM-YYYY
+    if (dateStr.includes('-') && !dateStr.startsWith('20')) {
+      const parts = dateStr.trim().split(' ');
+      const datePart = parts[0];
+      const timePart = parts[1] || '';
+      
+      const dateSubparts = datePart.split('-');
+      if (dateSubparts.length === 3) {
+        const day = parseInt(dateSubparts[0], 10);
+        const month = parseInt(dateSubparts[1], 10);
+        const year = parseInt(dateSubparts[2], 10);
+        
+        let hours = 0;
+        let minutes = 0;
+        if (timePart && timePart.includes(':')) {
+          const timeSubparts = timePart.split(':');
+          hours = parseInt(timeSubparts[0], 10) || 0;
+          minutes = parseInt(timeSubparts[1], 10) || 0;
+        }
+        
+        const parsedDate = new Date(year, month - 1, day, hours, minutes);
+        return isNaN(parsedDate.getTime()) ? 0 : parsedDate.getTime();
+      }
+    }
+    
+    const t = new Date(dateStr).getTime();
+    return isNaN(t) ? 0 : t;
+  } catch (error) {
+    console.warn("Failed to parse date string:", dateStr, error);
+    return 0;
+  }
+}
+
 // Help map Firebase Auth User and Firestore profile into AppUser
 export async function syncUserProfile(firebaseUser: FirebaseUser, defaultDisplayName?: string, defaultProviderId?: string): Promise<AppUser> {
   const userDocRef = doc(db, 'users', firebaseUser.uid);
@@ -138,6 +201,7 @@ export async function updateUserProfileDetails(uid: string, phoneNumber: string,
     });
   } catch (error) {
     console.error('Error updating user profile details in Firestore:', error);
+    throw error;
   }
 }
 
@@ -192,6 +256,7 @@ export async function createOrder(order: Order, userId?: string): Promise<void> 
     await setDoc(orderRef, cleanedOrder);
   } catch (error) {
     console.error('Error saving order to Firestore:', error);
+    throw error;
   }
 }
 
@@ -208,6 +273,7 @@ export async function createDonation(donation: DonationSubmission, userId?: stri
     await setDoc(donationRef, cleanedDonation);
   } catch (error) {
     console.error('Error saving donation to Firestore:', error);
+    throw error;
   }
 }
 
@@ -220,7 +286,7 @@ export async function getUserOrders(email: string): Promise<Order[]> {
     querySnapshot.forEach((doc) => {
       ordersList.push(doc.data() as Order);
     });
-    return ordersList.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return ordersList.sort((a, b) => parseVietnameseDate(b.createdAt) - parseVietnameseDate(a.createdAt));
   } catch (error) {
     console.error('Error fetching user orders from Firestore:', error);
     return [];
@@ -236,7 +302,7 @@ export async function getUserDonations(email: string): Promise<DonationSubmissio
     querySnapshot.forEach((doc) => {
       donationsList.push(doc.data() as DonationSubmission);
     });
-    return donationsList.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return donationsList.sort((a, b) => parseVietnameseDate(b.createdAt) - parseVietnameseDate(a.createdAt));
   } catch (error) {
     console.error('Error fetching user donations from Firestore:', error);
     return [];
@@ -251,7 +317,7 @@ export async function getAllOrders(): Promise<Order[]> {
     querySnapshot.forEach((doc) => {
       ordersList.push(doc.data() as Order);
     });
-    return ordersList.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return ordersList.sort((a, b) => parseVietnameseDate(b.createdAt) - parseVietnameseDate(a.createdAt));
   } catch (error) {
     console.error('Error fetching all orders from Firestore:', error);
     return [];
@@ -266,7 +332,7 @@ export async function getAllDonations(): Promise<DonationSubmission[]> {
     querySnapshot.forEach((doc) => {
       donationsList.push(doc.data() as DonationSubmission);
     });
-    return donationsList.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return donationsList.sort((a, b) => parseVietnameseDate(b.createdAt) - parseVietnameseDate(a.createdAt));
   } catch (error) {
     console.error('Error fetching all donations from Firestore:', error);
     return [];
@@ -353,7 +419,7 @@ export async function getAllVouchers(): Promise<Voucher[]> {
         ...doc.data()
       } as Voucher);
     });
-    return vouchersList.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return vouchersList.sort((a, b) => parseVietnameseDate(b.createdAt) - parseVietnameseDate(a.createdAt));
   } catch (error) {
     console.error('Error fetching all vouchers from Firestore:', error);
     return [];
@@ -461,7 +527,7 @@ export async function getAllEmailLogs(): Promise<EmailLog[]> {
     querySnapshot.forEach((doc) => {
       logsList.push(doc.data() as EmailLog);
     });
-    return logsList.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return logsList.sort((a, b) => parseVietnameseDate(b.createdAt) - parseVietnameseDate(a.createdAt));
   } catch (error) {
     console.error('Error fetching email logs:', error);
     return [];
