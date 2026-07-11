@@ -25,7 +25,7 @@ import {
   deleteProduct,
   db
 } from '../firebase';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
 
 interface AdminDashboardProps {
   user: User | null;
@@ -472,6 +472,31 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
     }
   };
 
+  const [isCleaningOrders, setIsCleaningOrders] = useState(false);
+
+  const handleCleanOldOrders = async () => {
+    if (!window.confirm('Bạn có muốn xóa toàn bộ các đơn hàng trong cơ sở dữ liệu, CHỈ GIỮ LẠI đơn hàng ECH-ORD-964676?')) {
+      return;
+    }
+    
+    setIsCleaningOrders(true);
+    try {
+      let count = 0;
+      for (const order of orders) {
+        if (order.id !== 'ECH-ORD-964676') {
+          await deleteDoc(doc(db, 'orders', order.id));
+          count++;
+        }
+      }
+      alert(`Đã xóa thành công ${count} đơn hàng! Chỉ giữ lại đơn ECH-ORD-964676.`);
+    } catch (err) {
+      console.error("Lỗi khi xóa đơn hàng:", err);
+      alert("Đã xảy ra lỗi khi xóa đơn hàng từ Firestore. Vui lòng thử lại.");
+    } finally {
+      setIsCleaningOrders(false);
+    }
+  };
+
   const handleAddProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProdName || !newProdDesc) {
@@ -728,19 +753,29 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
 
           {/* Special Action: Status filter for Orders, or Add Button for Products */}
           {activeTab === 'orders' && (
-            <div className="flex items-center space-x-2">
-              <Filter className="w-4 h-4 text-white/40 hidden sm:block" />
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-[#0F1012] border border-white/10 text-white px-3 py-2 text-xs sm:text-sm focus:outline-none rounded-xs font-mono"
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <div className="flex items-center space-x-2">
+                <Filter className="w-4 h-4 text-white/40 hidden sm:block" />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="bg-[#0F1012] border border-white/10 text-white px-3 py-2 text-xs sm:text-sm focus:outline-none rounded-xs font-mono"
+                >
+                  <option value="all">TẤT CẢ TRẠNG THÁI</option>
+                  <option value="pending">CHỜ XỬ LÝ (PENDING)</option>
+                  <option value="confirmed">ĐÃ XÁC NHẬN (CONFIRMED)</option>
+                  <option value="shipping">ĐANG GIAO HÀNG (SHIPPING)</option>
+                  <option value="completed">HOÀN TẤT (COMPLETED)</option>
+                </select>
+              </div>
+              <button
+                disabled={isCleaningOrders}
+                onClick={handleCleanOldOrders}
+                className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-4 py-2 text-xs sm:text-sm font-display font-black tracking-widest uppercase flex items-center justify-center space-x-1.5 transition-colors cursor-pointer rounded-xs"
               >
-                <option value="all">TẤT CẢ TRẠNG THÁI</option>
-                <option value="pending">CHỜ XỬ LÝ (PENDING)</option>
-                <option value="confirmed">ĐÃ XÁC NHẬN (CONFIRMED)</option>
-                <option value="shipping">ĐANG GIAO HÀNG (SHIPPING)</option>
-                <option value="completed">HOÀN TẤT (COMPLETED)</option>
-              </select>
+                <Trash2 className="w-4 h-4" />
+                <span>{isCleaningOrders ? 'ĐANG XÓA...' : 'XÓA ĐƠN CŨ (GIỮ LẠI ECH-ORD-964676)'}</span>
+              </button>
             </div>
           )}
 
