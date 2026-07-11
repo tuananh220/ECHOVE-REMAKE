@@ -128,6 +128,64 @@ export function parseVietnameseDate(dateStr: any): number {
   }
 }
 
+// Helper to shrink base64 images to prevent exceeding Firestore 1MB document size limit
+export function shrinkBase64Image(base64Str: string, maxWidth = 120, maxHeight = 120): Promise<string> {
+  return new Promise((resolve) => {
+    if (!base64Str || typeof base64Str !== 'string' || !base64Str.startsWith('data:image')) {
+      resolve(base64Str);
+      return;
+    }
+    
+    // Server-side guard (if code runs server-side during static build, etc.)
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      resolve(base64Str);
+      return;
+    }
+
+    try {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = base64Str;
+      img.onload = () => {
+        try {
+          let width = img.width;
+          let height = img.height;
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', 0.7)); // compress to jpeg with 70% quality
+          } else {
+            resolve(base64Str);
+          }
+        } catch (err) {
+          console.warn('Failed to shrink base64 image in canvas:', err);
+          resolve(base64Str);
+        }
+      };
+      img.onerror = () => {
+        resolve(base64Str);
+      };
+    } catch (err) {
+      console.warn('Failed to process shrinkBase64Image:', err);
+      resolve(base64Str);
+    }
+  });
+}
+
 // Help map Firebase Auth User and Firestore profile into AppUser
 export async function syncUserProfile(firebaseUser: FirebaseUser, defaultDisplayName?: string, defaultProviderId?: string): Promise<AppUser> {
   const userDocRef = doc(db, 'users', firebaseUser.uid);

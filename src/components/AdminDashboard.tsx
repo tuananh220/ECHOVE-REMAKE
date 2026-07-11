@@ -25,7 +25,8 @@ import {
   createProduct,
   deleteProduct,
   db,
-  TrafficLog
+  TrafficLog,
+  shrinkBase64Image
 } from '../firebase';
 import { collection, onSnapshot, doc, deleteDoc, setDoc } from 'firebase/firestore';
 
@@ -2091,9 +2092,11 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
                       if (!files) return;
                       Array.from(files).forEach((file: any) => {
                         const reader = new FileReader();
-                        reader.onloadend = () => {
+                        reader.onloadend = async () => {
                           if (typeof reader.result === 'string') {
-                            setNewProdImages(prev => [...prev, reader.result as string]);
+                            // Shrink product images to web-friendly max 800px width/height to avoid Firestore limits and speed up loading
+                            const compressed = await shrinkBase64Image(reader.result, 800, 800);
+                            setNewProdImages(prev => [...prev, compressed]);
                           }
                         };
                         reader.readAsDataURL(file);

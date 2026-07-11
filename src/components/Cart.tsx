@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingBag, X, Trash2, Plus, Minus, CreditCard, ShieldCheck, Truck, Sparkles, MapPin, CheckCircle, Tag, Check, AlertTriangle } from 'lucide-react';
-import { CartItem, Order, User, Voucher } from '../types';
-import { createOrder, getAllVouchers, updateVoucherUsage, updateUserProfileDetails } from '../firebase';
+import { CartItem, Order, User, Voucher, Product } from '../types';
+import { createOrder, getAllVouchers, updateVoucherUsage, updateUserProfileDetails, shrinkBase64Image } from '../firebase';
 import { sendAutomaticEmail } from '../emailService';
 
 interface CartProps {
@@ -154,6 +154,40 @@ export default function Cart({ isOpen, onClose, cartItems, onUpdateQuantity, onR
 
     const cleanEmail = email.toLowerCase().trim();
 
+    // Prune items to avoid Firestore 1MB document size limit by shrinking base64 images
+    const prunedItems: CartItem[] = await Promise.all(
+      cartItems.map(async (item) => {
+        let thumbnail = '';
+        if (item.product.images && item.product.images.length > 0) {
+          const firstImg = item.product.images[0];
+          if (firstImg.startsWith('data:image')) {
+            thumbnail = await shrinkBase64Image(firstImg, 100, 100);
+          } else {
+            thumbnail = firstImg;
+          }
+        }
+        const prunedProduct: Product = {
+          id: item.product.id,
+          name: item.product.name,
+          price: item.product.price,
+          description: '',
+          images: thumbnail ? [thumbnail] : [],
+          category: item.product.category,
+          story: '',
+          originalJeansCount: item.product.originalJeansCount || 0,
+          artisanDifficulty: item.product.artisanDifficulty || 'Trung bình',
+          measurements: {},
+          sizes: item.product.sizes || [],
+          isOneOfOne: item.product.isOneOfOne || false
+        };
+        return {
+          product: prunedProduct,
+          quantity: item.quantity,
+          selectedSize: item.selectedSize
+        };
+      })
+    );
+
     const newOrder: Order = {
       id: 'ECH-ORD-' + Math.floor(100000 + Math.random() * 900000),
       customerName,
@@ -161,7 +195,7 @@ export default function Cart({ isOpen, onClose, cartItems, onUpdateQuantity, onR
       email: cleanEmail,
       address,
       note: note || '',
-      items: [...cartItems],
+      items: prunedItems,
       totalPrice: total,
       originalPrice: appliedVoucher ? subtotal : undefined,
       discountApplied: appliedVoucher ? discountAmount : undefined,
