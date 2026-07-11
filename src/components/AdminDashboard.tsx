@@ -598,33 +598,35 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
   // Group orders by month for dynamic revenue charting
   const monthlyRevenue = React.useMemo(() => {
     const baseMonths = [
-      { name: 'Tháng 1', revenue: 2450000 },
-      { name: 'Tháng 2', revenue: 3100000 },
-      { name: 'Tháng 3', revenue: 4850000 },
-      { name: 'Tháng 4', revenue: 5200000 },
-      { name: 'Tháng 5', revenue: 6400000 },
-      { name: 'Tháng 6', revenue: 7800000 },
+      { name: 'Tháng 1', revenue: 0 },
+      { name: 'Tháng 2', revenue: 0 },
+      { name: 'Tháng 3', revenue: 0 },
+      { name: 'Tháng 4', revenue: 0 },
+      { name: 'Tháng 5', revenue: 0 },
+      { name: 'Tháng 6', revenue: 0 },
       { name: 'Tháng 7', revenue: 0 },
     ];
 
-    let liveJulyRevenue = 0;
     orders.forEach(order => {
       if (order.status === 'completed' || order.status === 'shipping' || order.status === 'confirmed') {
         const dateStr = order.createdAt || '';
-        // Parse date to put order value into proper month
-        if (dateStr.includes('-07-') || dateStr.includes('/07/') || !dateStr) {
-          liveJulyRevenue += order.totalPrice;
-        } else if (dateStr.includes('-06-') || dateStr.includes('/06/')) {
-          baseMonths[5].revenue += order.totalPrice;
-        } else if (dateStr.includes('-05-') || dateStr.includes('/05/')) {
-          baseMonths[4].revenue += order.totalPrice;
-        } else if (dateStr.includes('-04-') || dateStr.includes('/04/')) {
-          baseMonths[3].revenue += order.totalPrice;
+        // Find if it matches standard month formatting (/01/, -01-, etc.)
+        let matched = false;
+        for (let m = 1; m <= 7; m++) {
+          const mStr = m < 10 ? '0' + m : '' + m;
+          if (dateStr.includes(`/${mStr}/`) || dateStr.includes(`-${mStr}-`)) {
+            baseMonths[m - 1].revenue += order.totalPrice;
+            matched = true;
+            break;
+          }
+        }
+        // Fallback to July (Tháng 7) if not specifically matching any other month, or if date is empty
+        if (!matched) {
+          baseMonths[6].revenue += order.totalPrice;
         }
       }
     });
 
-    baseMonths[6].revenue = liveJulyRevenue || 3890000; // baseline if 0 so graph renders beautifully
     return baseMonths;
   }, [orders]);
 

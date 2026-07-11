@@ -128,6 +128,19 @@ export async function syncUserProfile(firebaseUser: FirebaseUser, defaultDisplay
   };
 }
 
+// Helper to update user details in Firestore
+export async function updateUserProfileDetails(uid: string, phoneNumber: string, address: string): Promise<void> {
+  try {
+    const userDocRef = doc(db, 'users', uid);
+    await updateDoc(userDocRef, {
+      phoneNumber,
+      address
+    });
+  } catch (error) {
+    console.error('Error updating user profile details in Firestore:', error);
+  }
+}
+
 // 1. Google Sign-In
 export async function signInWithGoogle(): Promise<AppUser> {
   const result = await signInWithPopup(auth, googleProvider);

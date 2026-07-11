@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShoppingBag, X, Trash2, Plus, Minus, CreditCard, ShieldCheck, Truck, Sparkles, MapPin, CheckCircle, Tag, Check, AlertTriangle } from 'lucide-react';
 import { CartItem, Order, User, Voucher } from '../types';
-import { createOrder, getAllVouchers, updateVoucherUsage } from '../firebase';
+import { createOrder, getAllVouchers, updateVoucherUsage, updateUserProfileDetails } from '../firebase';
 import { sendAutomaticEmail } from '../emailService';
 
 interface CartProps {
@@ -30,13 +30,21 @@ export default function Cart({ isOpen, onClose, cartItems, onUpdateQuantity, onR
   const [voucherSuccessMsg, setVoucherSuccessMsg] = useState('');
   const [isValidatingVoucher, setIsValidatingVoucher] = useState(false);
 
-  // Prefill user details if logged in
+  // Prefill user details if logged in or from localStorage fallback
   useEffect(() => {
-    if (user) {
-      if (!customerName) setCustomerName(user.displayName || '');
-      if (!email) setEmail(user.email || '');
-      if (!phone && user.phoneNumber) setPhone(user.phoneNumber);
-      if (!address && user.address) setAddress(user.address);
+    if (isCheckoutState) {
+      if (user) {
+        if (!customerName) setCustomerName(user.displayName || localStorage.getItem('echove_last_name') || '');
+        if (!email) setEmail(user.email || localStorage.getItem('echove_last_email') || '');
+        if (!phone) setPhone(user.phoneNumber || localStorage.getItem('echove_last_phone') || '');
+        if (!address) setAddress(user.address || localStorage.getItem('echove_last_address') || '');
+      } else {
+        // Guest user fallback from localStorage
+        if (!customerName) setCustomerName(localStorage.getItem('echove_last_name') || '');
+        if (!email) setEmail(localStorage.getItem('echove_last_email') || '');
+        if (!phone) setPhone(localStorage.getItem('echove_last_phone') || '');
+        if (!address) setAddress(localStorage.getItem('echove_last_address') || '');
+      }
     }
   }, [user, isCheckoutState]);
 
@@ -161,6 +169,12 @@ export default function Cart({ isOpen, onClose, cartItems, onUpdateQuantity, onR
       createdAt: new Date().toLocaleDateString('vi-VN') + ' ' + new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
     };
 
+    // Save details to localStorage for prefill fallback
+    localStorage.setItem('echove_last_name', customerName);
+    localStorage.setItem('echove_last_phone', phone);
+    localStorage.setItem('echove_last_email', email);
+    localStorage.setItem('echove_last_address', address);
+
     // Save order in localStorage so they can see order confirmation history
     const existingOrders = localStorage.getItem('echove_orders');
     const ordersList = existingOrders ? JSON.parse(existingOrders) : [];
@@ -171,6 +185,9 @@ export default function Cart({ isOpen, onClose, cartItems, onUpdateQuantity, onR
       await createOrder(newOrder, user?.uid || undefined);
       if (appliedVoucher) {
         await updateVoucherUsage(appliedVoucher.id);
+      }
+      if (user?.uid) {
+        await updateUserProfileDetails(user.uid, phone, address);
       }
     } catch (err) {
       console.error("Error saving order to cloud:", err);
