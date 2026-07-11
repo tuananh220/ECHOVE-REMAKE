@@ -41,5 +41,34 @@ service cloud.firestore {
       allow create: if true;
       allow read, update, delete: if isAdmin() || (isSignedIn() && resource.data.email == request.auth.token.email);
     }
+
+    // Deleted Users collection rules
+    match /deleted_users/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    // Traffic logs collection rules
+    match /traffic_logs/{logId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Vouchers collection rules
+    match /vouchers/{voucherId} {
+      allow read, update: if true;
+      allow create, delete: if isAdmin();
+    }
+
+    // Emails collection rules
+    match /emails/{emailId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Settings collection rules
+    match /settings/{settingsId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
   }
 }

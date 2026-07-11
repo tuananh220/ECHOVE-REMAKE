@@ -514,10 +514,6 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
   };
 
   const handleDeleteOrder = async (orderId: string) => {
-    if (orderId === 'ECH-ORD-964676') {
-      alert("Đơn hàng ECH-ORD-964676 được bảo vệ làm mẫu, không thể xóa!");
-      return;
-    }
     if (window.confirm(`Bạn có chắc chắn muốn xóa đơn hàng ${orderId} khỏi cơ sở dữ liệu?`)) {
       try {
         await deleteDoc(doc(db, 'orders', orderId));
@@ -1355,15 +1351,13 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
                       )}
 
                       {/* Individual Order Delete Button */}
-                      {order.id !== 'ECH-ORD-964676' && (
-                        <button
-                          onClick={() => handleDeleteOrder(order.id)}
-                          className="ml-2 p-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/25 text-red-400 hover:text-red-300 transition-colors rounded-xs cursor-pointer flex items-center justify-center"
-                          title="Xóa đơn hàng"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
+                      <button
+                        onClick={() => handleDeleteOrder(order.id)}
+                        className="ml-2 p-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/25 text-red-400 hover:text-red-300 transition-colors rounded-xs cursor-pointer flex items-center justify-center"
+                        title="Xóa đơn hàng"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
 

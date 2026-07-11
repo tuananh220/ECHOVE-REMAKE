@@ -33,10 +33,20 @@ export default function Cart({ isOpen, onClose, cartItems, onUpdateQuantity, onR
   // Prefill user details if logged in
   useEffect(() => {
     if (user) {
-      if (!customerName) setCustomerName(user.displayName);
-      if (!email) setEmail(user.email);
+      if (!customerName) setCustomerName(user.displayName || '');
+      if (!email) setEmail(user.email || '');
+      if (!phone && user.phoneNumber) setPhone(user.phoneNumber);
+      if (!address && user.address) setAddress(user.address);
     }
   }, [user, isCheckoutState]);
+
+  // Reset confirmation and checkout states when drawer is opened with active items
+  useEffect(() => {
+    if (isOpen && cartItems.length > 0) {
+      setConfirmedOrder(null);
+      setIsCheckoutState(false);
+    }
+  }, [isOpen, cartItems.length]);
 
   if (!isOpen) return null;
 
