@@ -47,6 +47,24 @@ export const db = getFirestore(app, "ai-studio-b730bc0b-bc45-46fb-85aa-832545fd0
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
+// Helper to sanitize undefined values before writing to Firestore
+function cleanUndefined(obj: any): any {
+  if (obj === null || obj === undefined) return null;
+  if (Array.isArray(obj)) {
+    return obj.map(item => cleanUndefined(item));
+  }
+  if (typeof obj === 'object') {
+    const cleanObj: any = {};
+    Object.keys(obj).forEach(key => {
+      if (obj[key] !== undefined) {
+        cleanObj[key] = cleanUndefined(obj[key]);
+      }
+    });
+    return cleanObj;
+  }
+  return obj;
+}
+
 // Help map Firebase Auth User and Firestore profile into AppUser
 export async function syncUserProfile(firebaseUser: FirebaseUser, defaultDisplayName?: string, defaultProviderId?: string): Promise<AppUser> {
   const userDocRef = doc(db, 'users', firebaseUser.uid);
@@ -152,11 +170,13 @@ export async function logOutUser(): Promise<void> {
 export async function createOrder(order: Order, userId?: string): Promise<void> {
   try {
     const orderRef = doc(db, 'orders', order.id);
-    await setDoc(orderRef, {
+    const cleanedOrder = cleanUndefined({
       ...order,
+      email: order.email.toLowerCase().trim(),
       userId: userId || null,
       createdAt: order.createdAt || new Date().toISOString()
     });
+    await setDoc(orderRef, cleanedOrder);
   } catch (error) {
     console.error('Error saving order to Firestore:', error);
   }
@@ -166,11 +186,13 @@ export async function createOrder(order: Order, userId?: string): Promise<void> 
 export async function createDonation(donation: DonationSubmission, userId?: string): Promise<void> {
   try {
     const donationRef = doc(db, 'donations', donation.id);
-    await setDoc(donationRef, {
+    const cleanedDonation = cleanUndefined({
       ...donation,
+      email: donation.email.toLowerCase().trim(),
       userId: userId || null,
       createdAt: donation.createdAt || new Date().toISOString()
     });
+    await setDoc(donationRef, cleanedDonation);
   } catch (error) {
     console.error('Error saving donation to Firestore:', error);
   }
@@ -329,11 +351,12 @@ export async function getAllVouchers(): Promise<Voucher[]> {
 export async function createVoucher(voucher: Voucher): Promise<void> {
   try {
     const voucherRef = doc(db, 'vouchers', voucher.id.toUpperCase().trim());
-    await setDoc(voucherRef, {
+    const cleanedVoucher = cleanUndefined({
       ...voucher,
       id: voucher.id.toUpperCase().trim(),
       createdAt: voucher.createdAt || new Date().toISOString()
     });
+    await setDoc(voucherRef, cleanedVoucher);
   } catch (error) {
     console.error('Error creating voucher in Firestore:', error);
     throw error;
@@ -407,10 +430,11 @@ export async function saveEmailConfig(config: EmailConfig): Promise<void> {
 export async function createEmailLog(log: EmailLog): Promise<void> {
   try {
     const logRef = doc(db, 'emails', log.id);
-    await setDoc(logRef, {
+    const cleanedLog = cleanUndefined({
       ...log,
       createdAt: log.createdAt || new Date().toISOString()
     });
+    await setDoc(logRef, cleanedLog);
   } catch (error) {
     console.error('Error saving email log to Firestore:', error);
   }
@@ -437,7 +461,7 @@ export async function getAllEmailLogs(): Promise<EmailLog[]> {
 export async function createProduct(product: Product): Promise<void> {
   try {
     const productRef = doc(db, 'products', product.id);
-    await setDoc(productRef, product);
+    await setDoc(productRef, cleanUndefined(product));
   } catch (error) {
     console.error(`Error saving product ${product.id} to Firestore:`, error);
     throw error;
