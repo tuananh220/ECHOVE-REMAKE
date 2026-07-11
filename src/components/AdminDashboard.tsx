@@ -22,8 +22,10 @@ import {
   getAllEmailLogs,
   getAllProducts,
   createProduct,
-  deleteProduct
+  deleteProduct,
+  db
 } from '../firebase';
+import { collection, onSnapshot } from 'firebase/firestore';
 
 interface AdminDashboardProps {
   user: User | null;
@@ -91,15 +93,21 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
     membersCount: 0
   });
 
-  // Load all data from Firestore (real-time) with LocalStorage fallback
+  // Load all data from Firestore (real-time) with LocalStorage fallback and real-time synchronization
   useEffect(() => {
-    async function loadAllData() {
-      if (!user || user.role !== 'admin') return;
-      
-      setIsLoadingData(true);
-      try {
-        // 1. Fetch Orders
-        const firestoreOrders = await getAllOrders();
+    if (!user || user.role !== 'admin') return;
+    
+    setIsLoadingData(true);
+    
+    // 1. Real-time listener for Orders
+    const unsubscribeOrders = onSnapshot(
+      collection(db, 'orders'),
+      (snapshot) => {
+        const firestoreOrders: Order[] = [];
+        snapshot.forEach((doc) => {
+          firestoreOrders.push(doc.data() as Order);
+        });
+        
         const savedOrders = localStorage.getItem('echove_orders');
         const localOrders: Order[] = savedOrders ? JSON.parse(savedOrders) : [];
         
@@ -113,22 +121,61 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
             import('../firebase').then(m => m.createOrder(o));
           }
         });
+        
         const orderList = Array.from(unifiedOrders.values()).sort(
           (a, b) => b.id.localeCompare(a.id)
         );
         setOrders(orderList);
         localStorage.setItem('echove_orders', JSON.stringify(orderList));
+        
+        // Calculate Stats
+        const totalSales = orderList
+          .filter(o => o.status === 'completed' || o.status === 'shipping' || o.status === 'confirmed')
+          .reduce((sum, o) => sum + o.totalPrice, 0);
+          
+        setStats(prev => ({
+          ...prev,
+          totalSales,
+          ordersCount: orderList.length
+        }));
+        setIsLoadingData(false);
+      },
+      (err) => {
+        console.error("Error listening to orders real-time:", err);
+        setIsLoadingData(false);
+      }
+    );
 
-        // 2. Fetch Products
-        const firestoreProducts = await getAllProducts();
-        setProducts(firestoreProducts);
-        localStorage.setItem('echove_products', JSON.stringify(firestoreProducts));
+    // 2. Real-time listener for Products
+    const unsubscribeProducts = onSnapshot(
+      collection(db, 'products'),
+      (snapshot) => {
+        const firestoreProducts: Product[] = [];
+        snapshot.forEach((doc) => {
+          firestoreProducts.push(doc.data() as Product);
+        });
+        
+        const sortedProducts = firestoreProducts.sort((a, b) => a.id.localeCompare(b.id));
+        setProducts(sortedProducts);
+        localStorage.setItem('echove_products', JSON.stringify(sortedProducts));
         if (onProductUpdate) {
-          onProductUpdate(firestoreProducts);
+          onProductUpdate(sortedProducts);
         }
+      },
+      (err) => {
+        console.error("Error listening to products real-time:", err);
+      }
+    );
 
-        // 3. Fetch Donations
-        const firestoreDonations = await getAllDonations();
+    // 3. Real-time listener for Donations
+    const unsubscribeDonations = onSnapshot(
+      collection(db, 'donations'),
+      (snapshot) => {
+        const firestoreDonations: DonationSubmission[] = [];
+        snapshot.forEach((doc) => {
+          firestoreDonations.push(doc.data() as DonationSubmission);
+        });
+        
         const savedDonations = localStorage.getItem('echove_donations');
         const localDonations: DonationSubmission[] = savedDonations ? JSON.parse(savedDonations) : [];
         
@@ -140,15 +187,43 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
             import('../firebase').then(m => m.createDonation(d));
           }
         });
+        
         const donationList = Array.from(unifiedDonations.values()).sort(
           (a, b) => b.id.localeCompare(a.id)
         );
         setDonations(donationList);
         localStorage.setItem('echove_donations', JSON.stringify(donationList));
+        
+        setStats(prev => ({
+          ...prev,
+          donationsCount: donationList.length
+        }));
+      },
+      (err) => {
+        console.error("Error listening to donations real-time:", err);
+      }
+    );
 
-        // 4. Fetch Registered Members from Firestore
-        const firestoreUsers = await getAllUsers();
-        // Since we want mock ones to also be there for rich visuals if they are not signed up yet:
+    // 4. Real-time listener for Registered Users/Members
+    const unsubscribeUsers = onSnapshot(
+      collection(db, 'users'),
+      (snapshot) => {
+        const firestoreUsers: User[] = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          firestoreUsers.push({
+            uid: doc.id,
+            email: data.email || '',
+            displayName: data.displayName || '',
+            photoURL: data.photoURL || undefined,
+            providerId: data.providerId || 'password',
+            points: data.points || 0,
+            role: data.role || 'user',
+            phoneNumber: data.phoneNumber || '',
+            address: data.address || ''
+          } as User);
+        });
+        
         const defaultMockUsers: User[] = [
           {
             uid: 'social-1',
@@ -177,33 +252,29 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
         ];
         
         const unifiedMembers = new Map<string, User>();
-        // Add defaults first
         defaultMockUsers.forEach(m => unifiedMembers.set(m.email.toLowerCase(), m));
-        // Overwrite/add real registered users from Firestore
         firestoreUsers.forEach(u => unifiedMembers.set(u.email.toLowerCase(), u));
         
         const memberList = Array.from(unifiedMembers.values());
         setMembers(memberList);
         localStorage.setItem('echove_all_registered_users', JSON.stringify(memberList));
-
-        // Calculate Stats
-        const totalSales = orderList
-          .filter(o => o.status === 'completed' || o.status === 'shipping' || o.status === 'confirmed')
-          .reduce((sum, o) => sum + o.totalPrice, 0);
-
-        setStats({
-          totalSales,
-          ordersCount: orderList.length,
-          donationsCount: donationList.length,
+        
+        setStats(prev => ({
+          ...prev,
           membersCount: memberList.filter(u => u.role !== 'admin').length
-        });
-      } catch (err) {
-        console.error("Error loading cloud admin data:", err);
-      } finally {
-        setIsLoadingData(false);
+        }));
+      },
+      (err) => {
+        console.error("Error listening to users real-time:", err);
       }
-    }
-    loadAllData();
+    );
+
+    return () => {
+      unsubscribeOrders();
+      unsubscribeProducts();
+      unsubscribeDonations();
+      unsubscribeUsers();
+    };
   }, [user]);
 
   // Load Vouchers and Email logs
