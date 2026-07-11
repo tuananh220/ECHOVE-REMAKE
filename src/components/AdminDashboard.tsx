@@ -677,31 +677,25 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
   const trafficStats = React.useMemo(() => {
     const counts: Record<string, number> = {
       'Trang chủ (Home)': 0,
-      'Sản phẩm (Collection)': 0,
+      'Cửa hàng (Shop)': 0,
       'Gửi đồ cũ (Donor)': 0,
       'Về chúng tôi (About)': 0,
-      'Cộng đồng (Community)': 0,
-      'Quản trị (Admin)': 0,
     };
 
     if (trafficLogs.length > 0) {
       trafficLogs.forEach(log => {
         const p = log.page;
         if (p === 'home') counts['Trang chủ (Home)']++;
-        else if (p === 'collection') counts['Sản phẩm (Collection)']++;
+        else if (p === 'shop' || p === 'collection') counts['Cửa hàng (Shop)']++;
         else if (p === 'donor') counts['Gửi đồ cũ (Donor)']++;
         else if (p === 'about') counts['Về chúng tôi (About)']++;
-        else if (p === 'community') counts['Cộng đồng (Community)']++;
-        else if (p === 'admin') counts['Quản trị (Admin)']++;
         else counts['Trang chủ (Home)']++;
       });
     } else {
       counts['Trang chủ (Home)'] = 345;
-      counts['Sản phẩm (Collection)'] = 289;
+      counts['Cửa hàng (Shop)'] = 289;
       counts['Gửi đồ cũ (Donor)'] = 122;
       counts['Về chúng tôi (About)'] = 87;
-      counts['Cộng đồng (Community)'] = 152;
-      counts['Quản trị (Admin)'] = 25;
     }
 
     return Object.entries(counts).map(([name, count]) => ({ name, count }));
@@ -1306,11 +1300,9 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
                     trafficLogs.slice(0, 15).map((log, idx) => {
                       const displayPage = 
                         log.page === 'home' ? 'Trang chủ' :
-                        log.page === 'collection' ? 'Bộ sưu tập' :
+                        log.page === 'shop' || log.page === 'collection' ? 'Cửa hàng' :
                         log.page === 'donor' ? 'Gửi jean cũ' :
-                        log.page === 'about' ? 'Về chúng tôi' :
-                        log.page === 'community' ? 'Cộng đồng' :
-                        log.page === 'admin' ? 'Trang quản trị' : log.page;
+                        log.page === 'about' ? 'Về chúng tôi' : log.page;
 
                       const formattedTime = log.timestamp 
                         ? new Date(log.timestamp).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
