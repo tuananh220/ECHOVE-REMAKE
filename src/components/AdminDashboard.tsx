@@ -4,7 +4,7 @@ import {
   CheckCircle, ArrowRight, RefreshCw, Filter, ShieldAlert, 
   ChevronRight, Award, Edit3, X, Coins, Eye, TrendingUp, Check, Play,
   Tag, Mail, Settings, Calendar, DollarSign, Percent, ToggleLeft, ToggleRight, Sparkles,
-  Smartphone, Monitor
+  Smartphone, Monitor, MapPin, Globe
 } from 'lucide-react';
 import { Product, Order, DonationSubmission, User, Voucher, EmailConfig, EmailLog } from '../types';
 import { PRODUCTS } from '../data';
@@ -727,6 +727,87 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
     ];
   }, [trafficLogs]);
 
+  const userAnalysis = React.useMemo(() => {
+    const activeUsers = members
+      .filter(m => m.role !== 'admin')
+      .filter(m => !deletedUserIds.has(m.uid));
+
+    const totalUsers = activeUsers.length;
+    const totalPoints = activeUsers.reduce((sum, u) => sum + (u.points || 0), 0);
+    const avgPoints = totalUsers > 0 ? Math.round(totalPoints / totalUsers) : 0;
+
+    let googleCount = 0;
+    let passwordCount = 0;
+    let facebookCount = 0;
+    let instagramCount = 0;
+
+    activeUsers.forEach(u => {
+      const p = (u.providerId || 'password').toLowerCase();
+      if (p === 'google' || p === 'google.com') googleCount++;
+      else if (p === 'facebook' || p === 'facebook.com') facebookCount++;
+      else if (p === 'instagram' || p === 'instagram.com') instagramCount++;
+      else passwordCount++;
+    });
+
+    let bronze = 0;
+    let silver = 0;
+    let gold = 0;
+    let platinum = 0;
+
+    activeUsers.forEach(u => {
+      const pts = u.points || 0;
+      if (pts < 100) bronze++;
+      else if (pts <= 250) silver++;
+      else if (pts <= 400) gold++;
+      else platinum++;
+    });
+
+    let hanoi = 0;
+    let tphcm = 0;
+    let danang = 0;
+    let haiphong = 0;
+    let other = 0;
+
+    activeUsers.forEach(u => {
+      const addr = (u.address || '').toLowerCase();
+      if (addr.includes('hà nội') || addr.includes('hn')) hanoi++;
+      else if (addr.includes('hồ chí minh') || addr.includes('hcm') || addr.includes('sài gòn') || addr.includes('quận') || addr.includes('thủ đức')) tphcm++;
+      else if (addr.includes('đà nẵng') || addr.includes('dn')) danang++;
+      else if (addr.includes('hải phòng') || addr.includes('hp')) haiphong++;
+      else other++;
+    });
+
+    const topMembers = [...activeUsers]
+      .sort((a, b) => (b.points || 0) - (a.points || 0))
+      .slice(0, 5);
+
+    return {
+      totalUsers,
+      totalPoints,
+      avgPoints,
+      providers: {
+        google: googleCount,
+        password: passwordCount,
+        facebook: facebookCount,
+        instagram: instagramCount
+      },
+      brackets: {
+        bronze,
+        silver,
+        gold,
+        platinum
+      },
+      locations: {
+        hanoi,
+        tphcm,
+        danang,
+        haiphong,
+        other
+      },
+      topMembers
+    };
+  }, [members, deletedUserIds]);
+
   const formatPrice = (value: number) => {
     return value.toLocaleString('vi-VN') + ' ₫';
   };
@@ -1347,6 +1428,261 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
 
             </div>
 
+            {/* Row 3: User Analysis Dashboard (Mới) */}
+            <div className="bg-[#1C1E22] border border-white/10 p-5 rounded-xs space-y-6">
+              
+              {/* Header section with sparkles */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/5 pb-4 gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <Users className="w-5 h-5 text-mustard" />
+                    <h3 className="text-base font-display font-black tracking-widest text-white uppercase">Phân Tích Thành Viên Street Club</h3>
+                  </div>
+                  <p className="text-[10px] font-mono text-white/40 uppercase">Số liệu phân tích, xếp hạng & phân bổ địa lý thành viên thời gian thực</p>
+                </div>
+                <div className="inline-flex items-center space-x-1.5 bg-mustard/10 border border-mustard/25 text-mustard px-2.5 py-1 rounded-xs font-mono text-[10px] uppercase">
+                  <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+                  <span>Cập nhật Live</span>
+                </div>
+              </div>
+
+              {/* Top Summary Metrics Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-[#0F1012] border border-white/5 p-4 rounded-xs space-y-1">
+                  <p className="text-[9px] font-mono text-white/40 uppercase tracking-wider">Tổng thành viên đăng ký</p>
+                  <p className="text-xl font-black text-white font-mono">{userAnalysis.totalUsers} thành viên</p>
+                  <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden mt-2">
+                    <div className="h-full bg-mustard rounded-full" style={{ width: '100%' }}></div>
+                  </div>
+                </div>
+
+                <div className="bg-[#0F1012] border border-white/5 p-4 rounded-xs space-y-1">
+                  <p className="text-[9px] font-mono text-white/40 uppercase tracking-wider">Điểm xanh tích lũy (Green Points)</p>
+                  <p className="text-xl font-black text-emerald-400 font-mono">{userAnalysis.totalPoints.toLocaleString('vi-VN')} PTS</p>
+                  <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden mt-2">
+                    <div className="h-full bg-emerald-400 rounded-full" style={{ width: '75%' }}></div>
+                  </div>
+                </div>
+
+                <div className="bg-[#0F1012] border border-white/5 p-4 rounded-xs space-y-1">
+                  <p className="text-[9px] font-mono text-white/40 uppercase tracking-wider">Điểm tích lũy trung bình</p>
+                  <p className="text-xl font-black text-white font-mono">{userAnalysis.avgPoints} PTS / User</p>
+                  <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden mt-2">
+                    <div className="h-full bg-denim-indigo rounded-full" style={{ width: '45%' }}></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Detail Analytics Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2">
+                
+                {/* 1. Point Brackets & Tier Distribution */}
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2 border-b border-white/5 pb-2">
+                    <Award className="w-4 h-4 text-mustard" />
+                    <span className="font-display font-bold text-xs uppercase tracking-wider text-white">Phân hạng Thành viên</span>
+                  </div>
+
+                  <div className="space-y-3.5">
+                    {/* Platinum Bracket */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px] font-mono">
+                        <span className="text-white font-semibold flex items-center space-x-1">
+                          <span className="inline-block w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
+                          <span>Chiến binh Denim (&gt;400 PTS)</span>
+                        </span>
+                        <span className="text-white/60">{userAnalysis.brackets.platinum} user</span>
+                      </div>
+                      <div className="h-2 bg-[#0F1012] rounded-xs overflow-hidden">
+                        <div
+                          className="h-full bg-indigo-500 rounded-xs transition-all duration-1000"
+                          style={{ width: `${userAnalysis.totalUsers ? (userAnalysis.brackets.platinum / userAnalysis.totalUsers) * 100 : 0}%` }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    {/* Gold Bracket */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px] font-mono">
+                        <span className="text-white font-semibold flex items-center space-x-1">
+                          <span className="inline-block w-2.5 h-2.5 rounded-full bg-mustard"></span>
+                          <span>Đại sứ Xanh (251-400 PTS)</span>
+                        </span>
+                        <span className="text-white/60">{userAnalysis.brackets.gold} user</span>
+                      </div>
+                      <div className="h-2 bg-[#0F1012] rounded-xs overflow-hidden">
+                        <div
+                          className="h-full bg-mustard rounded-xs transition-all duration-1000"
+                          style={{ width: `${userAnalysis.totalUsers ? (userAnalysis.brackets.gold / userAnalysis.totalUsers) * 100 : 0}%` }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    {/* Silver Bracket */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px] font-mono">
+                        <span className="text-white font-semibold flex items-center space-x-1">
+                          <span className="inline-block w-2.5 h-2.5 rounded-full bg-orange-earth"></span>
+                          <span>Đích thực (100-250 PTS)</span>
+                        </span>
+                        <span className="text-white/60">{userAnalysis.brackets.silver} user</span>
+                      </div>
+                      <div className="h-2 bg-[#0F1012] rounded-xs overflow-hidden">
+                        <div
+                          className="h-full bg-orange-earth rounded-xs transition-all duration-1000"
+                          style={{ width: `${userAnalysis.totalUsers ? (userAnalysis.brackets.silver / userAnalysis.totalUsers) * 100 : 0}%` }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    {/* Bronze Bracket */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px] font-mono">
+                        <span className="text-white font-semibold flex items-center space-x-1">
+                          <span className="inline-block w-2.5 h-2.5 rounded-full bg-white/30"></span>
+                          <span>Thành viên Mới (&lt;100 PTS)</span>
+                        </span>
+                        <span className="text-white/60">{userAnalysis.brackets.bronze} user</span>
+                      </div>
+                      <div className="h-2 bg-[#0F1012] rounded-xs overflow-hidden">
+                        <div
+                          className="h-full bg-white/30 rounded-xs transition-all duration-1000"
+                          style={{ width: `${userAnalysis.totalUsers ? (userAnalysis.brackets.bronze / userAnalysis.totalUsers) * 100 : 0}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. Geo-location breakdown */}
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2 border-b border-white/5 pb-2">
+                    <MapPin className="w-4 h-4 text-mustard" />
+                    <span className="font-display font-bold text-xs uppercase tracking-wider text-white">Phân bố Vùng miền</span>
+                  </div>
+
+                  <div className="space-y-3">
+                    {/* TP. HCM */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px] font-mono">
+                        <span className="text-white/70">TP. Hồ Chí Minh & Miền Nam</span>
+                        <span className="text-white font-bold">{userAnalysis.locations.tphcm} user</span>
+                      </div>
+                      <div className="h-1.5 bg-[#0F1012] rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-mustard rounded-full"
+                          style={{ width: `${userAnalysis.totalUsers ? (userAnalysis.locations.tphcm / userAnalysis.totalUsers) * 100 : 0}%` }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    {/* Hà Nội */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px] font-mono">
+                        <span className="text-white/70">Hà Nội & Miền Bắc</span>
+                        <span className="text-white font-bold">{userAnalysis.locations.hanoi} user</span>
+                      </div>
+                      <div className="h-1.5 bg-[#0F1012] rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-mustard rounded-full"
+                          style={{ width: `${userAnalysis.totalUsers ? (userAnalysis.locations.hanoi / userAnalysis.totalUsers) * 100 : 0}%` }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    {/* Đà Nẵng */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px] font-mono">
+                        <span className="text-white/70">Đà Nẵng & Miền Trung</span>
+                        <span className="text-white font-bold">{userAnalysis.locations.danang} user</span>
+                      </div>
+                      <div className="h-1.5 bg-[#0F1012] rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-mustard rounded-full"
+                          style={{ width: `${userAnalysis.totalUsers ? (userAnalysis.locations.danang / userAnalysis.totalUsers) * 100 : 0}%` }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    {/* Hải Phòng */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px] font-mono">
+                        <span className="text-white/70">Hải Phòng</span>
+                        <span className="text-white font-bold">{userAnalysis.locations.haiphong} user</span>
+                      </div>
+                      <div className="h-1.5 bg-[#0F1012] rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-mustard rounded-full"
+                          style={{ width: `${userAnalysis.totalUsers ? (userAnalysis.locations.haiphong / userAnalysis.totalUsers) * 100 : 0}%` }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    {/* Khác */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-[11px] font-mono">
+                        <span className="text-white/70">Các tỉnh thành khác</span>
+                        <span className="text-white font-bold">{userAnalysis.locations.other} user</span>
+                      </div>
+                      <div className="h-1.5 bg-[#0F1012] rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-mustard rounded-full"
+                          style={{ width: `${userAnalysis.totalUsers ? (userAnalysis.locations.other / userAnalysis.totalUsers) * 100 : 0}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Eco-Warriors Leaderboard */}
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2 border-b border-white/5 pb-2">
+                    <Globe className="w-4 h-4 text-mustard" />
+                    <span className="font-display font-bold text-xs uppercase tracking-wider text-white">Bảng Vàng Thành Viên (Top Points)</span>
+                  </div>
+
+                  <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                    {userAnalysis.topMembers.map((member, idx) => {
+                      let medal = '•';
+                      if (idx === 0) medal = '🥇';
+                      else if (idx === 1) medal = '🥈';
+                      else if (idx === 2) medal = '🥉';
+
+                      return (
+                        <div key={member.uid} className="flex items-center justify-between bg-[#0F1012] hover:bg-white/[0.02] border border-white/5 p-2 rounded-xs transition-all">
+                          <div className="flex items-center space-x-2 min-w-0">
+                            <span className="text-xs shrink-0 w-5 text-center">{medal}</span>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-white truncate max-w-[120px]">{member.displayName || 'Thành viên ẩn danh'}</p>
+                              <p className="text-[9px] font-mono text-white/40 truncate max-w-[120px]" title={member.email}>{member.email}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className="font-mono text-xs font-black text-mustard bg-mustard/10 px-2 py-0.5 border border-mustard/15 rounded-sm">
+                              {member.points || 0} PTS
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Provider breakdown summary footbar */}
+              <div className="bg-[#0F1012] border border-white/5 p-3 rounded-xs flex flex-wrap justify-between items-center text-[10px] font-mono text-white/50 gap-3">
+                <span className="uppercase text-white/30">Cổng liên kết:</span>
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  <span>Google SSO: <strong className="text-white">{userAnalysis.providers.google} user</strong></span>
+                  <span>Facebook: <strong className="text-white">{userAnalysis.providers.facebook} user</strong></span>
+                  <span>Instagram: <strong className="text-white">{userAnalysis.providers.instagram} user</strong></span>
+                  <span>Email/Mật khẩu: <strong className="text-white">{userAnalysis.providers.password} user</strong></span>
+                </div>
+              </div>
+
+            </div>
+
           </div>
         )}
 
@@ -1728,9 +2064,18 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
 
         {/* TAB 4: MEMBERS MANAGEMENT */}
         {activeTab === 'users' && (
-          <div className="bg-[#1C1E22] border border-white/10 rounded-xs overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs sm:text-sm">
+          <div className="space-y-4">
+            {/* Header Area */}
+            <div className="p-4 bg-[#1C1E22] border border-white/10 rounded-xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <div>
+                <h3 className="font-display font-bold text-sm tracking-widest text-white uppercase">Quản lý Thành viên</h3>
+                <p className="text-[10px] font-mono text-white/40 mt-1 uppercase">Quản lý danh sách thành viên tích lũy điểm xanh upcycling</p>
+              </div>
+            </div>
+
+            <div className="bg-[#1C1E22] border border-white/10 rounded-xs overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs sm:text-sm">
                 <thead>
                   <tr className="border-b border-white/10 bg-[#0F1012] font-mono text-[10px] uppercase text-white/40 tracking-wider">
                     <th className="p-4">Nickname</th>
@@ -1802,6 +2147,7 @@ export default function AdminDashboard({ user, onProductUpdate }: AdminDashboard
                 </tbody>
               </table>
             </div>
+          </div>
           </div>
         )}
 
